@@ -70,7 +70,7 @@ module.exports = {
 
   /*
   POST /api/aptitude/answers/submit
-  Saves written subjective student answers to the database for grading.
+  Saves written subjective student answers to the database and evaluates them instantly using Gemini.
   */
   submitWrittenAnswers: async (req, res, next) => {
     try {
@@ -80,14 +80,35 @@ module.exports = {
       }
 
       const results = [];
+      const aiService = require('../services/aiService');
+      const db = require('../config/db');
+
       for (const ans of answers) {
-        const row = await Answer.submitAnswer(req.user.user_id, ans.questionId, ans.submittedAnswer);
-        results.push(row);
+        // Query database to retrieve the question text
+        const qRes = await db.query('SELECT question_text FROM questions WHERE question_id = $1', [ans.questionId]);
+        const questionText = qRes.rows[0] ? qRes.rows[0].question_text : 'Subjective verbal question response.';
+        
+        // Grade dynamically using Gemini AI API helper
+        const evalResult = await aiService.evaluateSubjectiveAnswer(questionText, ans.submittedAnswer);
+        
+        // Submit answer with score and feedback to PostgreSQL
+        const row = await Answer.submitAnswer(
+          req.user.user_id, 
+          ans.questionId, 
+          ans.submittedAnswer, 
+          evalResult.score, 
+          evalResult.feedback
+        );
+        
+        results.push({
+          ...row,
+          evaluation: evalResult
+        });
       }
 
       return res.status(200).json({
         success: true,
-        message: `Successfully logged ${results.length} answers.`,
+        message: `Successfully logged and graded ${results.length} answers.`,
         answers: results
       });
     } catch (error) {

@@ -15,14 +15,14 @@ module.exports = {
   Params: studentId (UUID), questionId (UUID), submittedAnswer (string).
   Returns: Database row of the newly inserted or updated answer.
   */
-  submitAnswer: async (studentId, questionId, submittedAnswer) => {
+  submitAnswer: async (studentId, questionId, submittedAnswer, score = null, feedback = null) => {
     const res = await db.query(
-      `INSERT INTO student_answers (student_id, question_id, submitted_answer)
-       VALUES ($1, $2, $3)
+      `INSERT INTO student_answers (student_id, question_id, submitted_answer, score, feedback)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (student_id, question_id) 
-       DO UPDATE SET submitted_answer = EXCLUDED.submitted_answer, score = NULL, feedback = NULL, created_at = NOW()
+       DO UPDATE SET submitted_answer = EXCLUDED.submitted_answer, score = EXCLUDED.score, feedback = EXCLUDED.feedback, created_at = NOW()
        RETURNING *`,
-      [studentId, questionId, submittedAnswer]
+      [studentId, questionId, submittedAnswer, score, feedback]
     );
     return res.rows[0];
   },

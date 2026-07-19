@@ -63,5 +63,23 @@ module.exports = {
     } catch (error) {
       return next(error);
     }
+  },
+
+  /*
+  POST /api/resume/ai-rewrite
+  Rewrites resume bullet-points using Gemini.
+  */
+  aiRewriteResume: async (req, res, next) => {
+    try {
+      const { sectionType, rawText } = req.body;
+      if (!rawText) {
+        return res.status(400).json({ success: false, message: 'Raw text content is required.' });
+      }
+
+      const rewritten = await aiService.rewriteResumeSection(sectionType, rawText);
+      return res.status(200).json(rewritten);
+    } catch (error) {
+      return next(error);
+    }
   }
 };

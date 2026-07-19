@@ -8,6 +8,7 @@ Dependencies: GroupDiscussion, Student
 */
 
 const GroupDiscussion = require('../models/GroupDiscussion');
+const aiService = require('../services/aiService');
 
 module.exports = {
   /*
@@ -57,6 +58,24 @@ module.exports = {
         success: true,
         discussions: list
       });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /*
+  POST /api/group-discussion/ai-coach
+  Simulates a GD coach/panel evaluation of an argument stance.
+  */
+  aiGDCoach: async (req, res, next) => {
+    try {
+      const { topic, stance, argument } = req.body;
+      if (!topic || !argument) {
+        return res.status(400).json({ success: false, message: 'GD topic and argument text are required.' });
+      }
+
+      const evaluation = await aiService.evaluateGDArgument(topic, stance, argument);
+      return res.status(200).json(evaluation);
     } catch (error) {
       return next(error);
     }

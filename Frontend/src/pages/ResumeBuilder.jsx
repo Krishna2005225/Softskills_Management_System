@@ -25,6 +25,13 @@ import { FileText, Upload, CheckCircle2, AlertTriangle, Lightbulb } from 'lucide
 const ResumeBuilder = () => {
   const [atsScore, setAtsScore] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // Rewriter states
+  const [sectionType, setSectionType] = useState('Work Experience');
+  const [rawText, setRawText] = useState('');
+  const [rewriting, setRewriting] = useState(false);
+  const [rewrittenPoints, setRewrittenPoints] = useState([]);
+
   const fileInputRef = useRef(null);
 
   const triggerFileSelect = () => {
@@ -65,6 +72,28 @@ const ResumeBuilder = () => {
     }
   };
 
+  const handleRewrite = async (e) => {
+    e.preventDefault();
+    if (!rawText.trim()) return;
+
+    setRewriting(true);
+    setRewrittenPoints([]);
+    try {
+      const res = await axiosClient.post('/resume/ai-rewrite', {
+        sectionType,
+        rawText
+      });
+      if (res.data.success) {
+        setRewrittenPoints(res.data.rewrittenPoints);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('AI rewrite failed. Verify backend key configuration.');
+    } finally {
+      setRewriting(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -95,6 +124,52 @@ const ResumeBuilder = () => {
                 <Upload className="w-4 h-4" /> Parse Document
               </Button>
             </div>
+          </Card>
+
+          <Card title="AI Section Optimizer">
+            <form onSubmit={handleRewrite} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase">Select Resume Section</label>
+                <select
+                  value={sectionType}
+                  onChange={e => setSectionType(e.target.value)}
+                  className="mt-1.5 block w-full px-4 py-2 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="Work Experience">Work Experience</option>
+                  <option value="Projects">Projects</option>
+                  <option value="Profile Summary">Profile Summary</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase">Paste Raw Description</label>
+                <textarea
+                  rows="4"
+                  required
+                  value={rawText}
+                  onChange={e => setRawText(e.target.value)}
+                  placeholder="e.g. I did coding in python and made queries fast on sql database for project..."
+                  className="mt-1.5 block w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <Button type="submit" variant="outline" loading={rewriting} className="w-full justify-center text-xs">
+                Optimize with Gemini
+              </Button>
+            </form>
+
+            {rewrittenPoints.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <h4 className="font-bold text-[10px] text-emerald-600 uppercase">Optimized Output:</h4>
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  {rewrittenPoints.map((pt, idx) => (
+                    <p key={idx} className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold leading-relaxed">
+                      • {pt}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
         </div>
 

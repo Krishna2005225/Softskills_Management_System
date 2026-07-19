@@ -32,4 +32,10 @@ Retrieves discussion schedules.
 */
 router.get('/list', protect, groupDiscussionController.listDiscussions);
 
+/*
+POST /api/group-discussion/ai-coach
+Evaluates GD argument and generates AI counter-arguments.
+*/
+router.post('/ai-coach', protect, groupDiscussionController.aiGDCoach);
+
 module.exports = router;

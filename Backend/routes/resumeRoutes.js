@@ -37,4 +37,10 @@ Retrieves previous ATS evaluation scores log.
 */
 router.get('/history', protect, resumeController.getHistory);
 
+/*
+POST /api/resume/ai-rewrite
+Rewrites a portion of user resume.
+*/
+router.post('/ai-rewrite', protect, resumeController.aiRewriteResume);
+
 module.exports = router;
