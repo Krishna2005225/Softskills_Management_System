@@ -148,7 +148,7 @@ module.exports = {
   */
   getProfile: async (req, res, next) => {
     try {
-      const profile = await User.findById(req.user.user_id);
+      const profile = await Student.getStudentProfile(req.user.user_id);
       return res.status(200).json({ success: true, user: profile });
     } catch (error) {
       return next(error);
@@ -161,9 +161,18 @@ module.exports = {
   */
   updateProfile: async (req, res, next) => {
     try {
-      const { name, department } = req.body;
-      const updated = await User.updateProfile(req.user.user_id, name, department);
-      return res.status(200).json({ success: true, user: updated });
+      const { name, department, roll_no, year, cgpa } = req.body;
+      
+      // Update core user row
+      const updatedUser = await User.updateProfile(req.user.user_id, name, department);
+      
+      // If student, also update student-specific row
+      if (req.user.role === 'STUDENT') {
+        await Student.updateStudentInfo(req.user.user_id, roll_no, year, cgpa);
+      }
+
+      const fullProfile = await Student.getStudentProfile(req.user.user_id);
+      return res.status(200).json({ success: true, user: fullProfile });
     } catch (error) {
       return next(error);
     }

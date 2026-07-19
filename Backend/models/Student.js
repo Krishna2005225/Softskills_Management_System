@@ -111,5 +111,33 @@ module.exports = {
         count: parseInt(writtenRes.rows[0].count) || 0
       }
     };
+  },
+
+  /*
+  Fetches unified profile fields including student metrics.
+  */
+  getStudentProfile: async (studentId) => {
+    const res = await db.query(
+      `SELECT u.name, u.email, u.role, u.department, s.roll_no, s.year, s.cgpa, s.placement_score
+       FROM users u
+       LEFT JOIN students s ON u.user_id = s.student_id
+       WHERE u.user_id = $1`,
+      [studentId]
+    );
+    return res.rows[0];
+  },
+
+  /*
+  Updates roll_no, year, and cgpa for a student.
+  */
+  updateStudentInfo: async (studentId, rollNo, year, cgpa) => {
+    const res = await db.query(
+      `UPDATE students 
+       SET roll_no = $1, year = $2, cgpa = $3 
+       WHERE student_id = $4 
+       RETURNING *`,
+      [rollNo, year, cgpa, studentId]
+    );
+    return res.rows[0];
   }
 };
