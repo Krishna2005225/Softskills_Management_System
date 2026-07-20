@@ -12,7 +12,7 @@ import axiosClient from '../api/axiosClient';
 import { 
   Users, Sparkles, HelpCircle, ThumbsUp, ThumbsDown, Star, CheckCircle, 
   AlertCircle, AlertTriangle, Lightbulb, ChevronRight, Edit3, BookOpen, 
-  Brain, Target, Info, RefreshCw, X, Play, BarChart3
+  Brain, Target, Info, RefreshCw, X, Play, BarChart3, Trophy
 } from 'lucide-react';
 
 const GroupDiscussion = () => {
