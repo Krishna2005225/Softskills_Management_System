@@ -32,27 +32,42 @@ const Profile = () => {
   
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [certificates, setCertificates] = useState([]);
+  const [claiming, setClaiming] = useState(false);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axiosClient.get('/auth/profile');
+      if (res.data.success) {
+        const u = res.data.user;
+        setProfile(u);
+        setName(u.name || '');
+        setDepartment(u.department || 'CSE');
+        setRollNo(u.roll_no || '');
+        setYear(u.year || '');
+        setCgpa(u.cgpa || '');
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCertificates = async () => {
+    try {
+      const res = await axiosClient.get('/certificates');
+      if (res.data.success) {
+        setCertificates(res.data.certificates);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axiosClient.get('/auth/profile');
-        if (res.data.success) {
-          const u = res.data.user;
-          setProfile(u);
-          setName(u.name || '');
-          setDepartment(u.department || 'CSE');
-          setRollNo(u.roll_no || '');
-          setYear(u.year || '');
-          setCgpa(u.cgpa || '');
-        }
-      } catch (err) {
-        console.error('Failed to load profile:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProfile();
+    fetchCertificates();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -75,6 +90,21 @@ const Profile = () => {
       alert('Failed to save profile changes.');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    try {
+      const res = await axiosClient.post('/certificates/claim');
+      if (res.data.success) {
+        alert(res.data.message);
+        fetchCertificates();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to claim certificate.');
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -202,8 +232,56 @@ const Profile = () => {
             </div>
           </form>
         </Card>
-
       </div>
+
+      {/* Certificates section */}
+      {profile?.role === 'STUDENT' && (
+        <div className="grid md:grid-cols-3 gap-8 mt-8">
+          <Card title="Verified Claims & Awards" className="md:col-span-3">
+            {certificates.length > 0 ? (
+              <div className="space-y-6 max-w-2xl">
+                {certificates.map((cert) => (
+                  <div key={cert.certificate_id} className="p-8 border-4 border-double border-amber-500 rounded-3xl bg-amber-50/10 dark:bg-amber-950/10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+                    <div className="space-y-2">
+                      <span className="px-3 py-1 bg-amber-500 text-white rounded-full text-[9px] font-bold tracking-wider uppercase">
+                        Verified Claim
+                      </span>
+                      <h3 className="text-lg font-extrabold text-amber-700 dark:text-amber-400 font-sans mt-2">Placement Readiness Certificate</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">This certifies that <strong>{name}</strong> has achieved the required placement index in soft skills modules.</p>
+                      <p className="text-[10px] font-mono text-slate-400 mt-2 font-bold">Verification ID: {cert.verification_hash}</p>
+                    </div>
+
+                    <div className="shrink-0 flex flex-col items-center gap-2">
+                      {/* QR Code SVG */}
+                      <svg width="80" height="80" viewBox="0 0 29 29" fill="none" className="bg-white p-1.5 rounded-xl shadow border border-slate-100">
+                        <path d="M0 0h7v7H0V0zm1 1v5h5V1H1zm2 2h1v1H3V3zm18-3h7v7h-7V0zm1 1v5h5V1h-5zm2 2h1v1h-1V3zM0 22h7v7H0v-7zm1 1v5h5v-5H1zm2 2h1v1H3v-1zm13-13v2h2v-2h-2zm4 0v2h2v-2h-2zm-2 2v2h2v-2h-2zm4 0v2h2v-2h-2zm-4 4v2h2v-2h-2zm2 2v2h2v-2h-2zm-6 2v2h2v-2h-2zm6 0v2h2v-2h-2z" fill="#000"/>
+                        <path d="M9 1h1v1H9V1zm2 1h1v1h-1V2zm0 2h1v1h-1V4zm-2 1h1v1H9V5zm4-4h1v1h-1V1zm1 2h1v1h-1V3zm-2 2h1v1h-1V5zm9 5h1v1h-1v-1zm0 2h1v1h-1v-1zm-2-1h1v1h-1v-1zm-2 2h1v1h-1v-1zm3 2h1v1h-1v-1zm-2 1h1v1h-1v-1z" fill="#000"/>
+                      </svg>
+                      <span className="text-[8px] font-bold font-mono text-slate-400 uppercase">Scan to Verify</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 space-y-4">
+                <p className="text-xs text-slate-400">You haven't claimed any certificates yet.</p>
+                {profile?.placement_score >= 80 ? (
+                  <Button 
+                    onClick={handleClaim} 
+                    loading={claiming}
+                    variant="primary" 
+                    className="text-xs font-bold px-6 bg-amber-600 hover:bg-amber-700"
+                  >
+                    Claim Placement Readiness Certificate
+                  </Button>
+                ) : (
+                  <p className="text-xs font-bold text-rose-500">Achieve a placement readiness score of 80% or more to unlock certificate claims. (Current Score: {profile?.placement_score}%)</p>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

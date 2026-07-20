@@ -50,6 +50,7 @@ import Profile from '../pages/Profile';
 import NotFound from '../pages/NotFound';
 import CareerAdvisor from '../pages/CareerAdvisor';
 import DiscussionForum from '../pages/DiscussionForum';
+import CodingArena from '../pages/CodingArena';
 
 const AppRoutes = () => {
   return (
@@ -167,6 +168,10 @@ const AppRoutes = () => {
         <Route 
           path="/forum" 
           element={<ProtectedRoute allowedRoles={['STUDENT', 'FACULTY', 'PLACEMENT_OFFICER', 'ADMIN']}><DiscussionForum /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/coding" 
+          element={<ProtectedRoute allowedRoles={['STUDENT']}><CodingArena /></ProtectedRoute>} 
         />
       </Route>
 
