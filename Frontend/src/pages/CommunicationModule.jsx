@@ -23,6 +23,10 @@ const CommunicationModule = () => {
   const [passageId, setPassageId] = useState('');
   const [activeTab, setActiveTab] = useState('reading');
 
+  // Dynamic passages list states
+  const [passages, setPassages] = useState([]);
+  const [currentPassageIdx, setCurrentPassageIdx] = useState(0);
+
   // Summary Answer States
   const [summaryAnswer, setSummaryAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -62,20 +66,54 @@ const CommunicationModule = () => {
     axiosClient.get('/aptitude/questions?category=VERBAL')
       .then(res => {
         if (res.data.success && res.data.questions.length > 0) {
-          const verbalQ = res.data.questions.find(q => q.options === null) || res.data.questions[0];
-          setPassage(verbalQ.question_text);
-          setPassageId(verbalQ.question_id);
+          const verbalQs = res.data.questions.filter(q => q.options === null);
+          if (verbalQs.length > 0) {
+            setPassages(verbalQs);
+            setPassage(verbalQs[0].question_text);
+            setPassageId(verbalQs[0].question_id);
+            setCurrentPassageIdx(0);
+          } else {
+            const fallback = res.data.questions[0];
+            setPassages([fallback]);
+            setPassage(fallback.question_text);
+            setPassageId(fallback.question_id);
+            setCurrentPassageIdx(0);
+          }
         } else {
-          setPassage("Effective communication depends not only on speaking clearly but also on active listening. When we listen with empathy and understanding, we create a safe space for ideas to flow. Clear intent helps in delivering messages that are decoded accurately, while digesting the information ensures better response and action. This cycle of clarity, empathy, and intent strengthens relationships and builds trust.");
-          setPassageId('e2b10a30-80de-444a-bdfc-27660ca4cd98');
+          const defPassage = {
+            question_id: 'e2b10a30-80de-444a-bdfc-27660ca4cd98',
+            question_text: "Effective communication depends not only on speaking clearly but also on active listening. When we listen with empathy and understanding, we create a safe space for ideas to flow. Clear intent helps in delivering messages that are decoded accurately, while digesting the information ensures better response and action. This cycle of clarity, empathy, and intent strengthens relationships and builds trust."
+          };
+          setPassages([defPassage]);
+          setPassage(defPassage.question_text);
+          setPassageId(defPassage.question_id);
+          setCurrentPassageIdx(0);
         }
       })
       .catch(() => {
-        setPassage("Effective communication depends not only on speaking clearly but also on active listening. When we listen with empathy and understanding, we create a safe space for ideas to flow. Clear intent helps in delivering messages that are decoded accurately, while digesting the information ensures better response and action. This cycle of clarity, empathy, and intent strengthens relationships and builds trust.");
-        setPassageId('e2b10a30-80de-444a-bdfc-27660ca4cd98');
+        const defPassage = {
+          question_id: 'e2b10a30-80de-444a-bdfc-27660ca4cd98',
+          question_text: "Effective communication depends not only on speaking clearly but also on active listening. When we listen with empathy and understanding, we create a safe space for ideas to flow. Clear intent helps in delivering messages that are decoded accurately, while digesting the information ensures better response and action. This cycle of clarity, empathy, and intent strengthens relationships and builds trust."
+        };
+        setPassages([defPassage]);
+        setPassage(defPassage.question_text);
+        setPassageId(defPassage.question_id);
+        setCurrentPassageIdx(0);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handlePassageChange = (index) => {
+    if (index >= 0 && index < passages.length) {
+      setCurrentPassageIdx(index);
+      setPassage(passages[index].question_text);
+      setPassageId(passages[index].question_id);
+      setSummaryAnswer('');
+      setResult(null);
+      setPronounceResult(null);
+      setSpeechTranscript('');
+    }
+  };
 
   // Track dynamic compliance of the summary in real-time
   useEffect(() => {
@@ -500,10 +538,10 @@ const CommunicationModule = () => {
                       Intermediate
                     </span>
                     <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" /> 4 min read
+                      <Clock className="w-3.5 h-3.5" /> {Math.ceil(passage.split(/\s+/).filter(Boolean).length / 150) || 1} min read
                     </span>
                     <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 border-l border-slate-250 dark:border-slate-800 pl-2">
-                      <FileText className="w-3.5 h-3.5" /> 285 words
+                      <FileText className="w-3.5 h-3.5" /> {passage.split(/\s+/).filter(Boolean).length} words
                     </span>
                   </div>
                 </div>
@@ -511,14 +549,41 @@ const CommunicationModule = () => {
                 <div className="flex items-center gap-3">
                   <span className="text-[11px] font-black text-slate-450 uppercase tracking-wider">Reading Progress</span>
                   <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="w-[80%] bg-blue-505 h-full rounded-full transition-all duration-300" />
+                    <div 
+                      style={{ width: `${passages.length > 0 ? Math.round(((currentPassageIdx + 1) / passages.length) * 100) : 100}%` }}
+                      className="bg-blue-500 h-full rounded-full transition-all duration-300" 
+                    />
                   </div>
-                  <span className="text-xs font-bold text-slate-455 font-sans">Paragraph 4 of 5</span>
+                  <span className="text-xs font-bold text-slate-455 font-sans">
+                    Passage {currentPassageIdx + 1} of {passages.length}
+                  </span>
                 </div>
 
-                <div className="p-6 bg-slate-50 dark:bg-[#0a0f1d] border border-slate-150 dark:border-slate-800/50 rounded-2xl text-slate-855 dark:text-slate-200 leading-relaxed text-sm font-semibold">
-                  <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-500 dark:text-purple-400 rounded-md border border-purple-500/15">Effective communication</span> depends not only on <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-505 dark:text-blue-400 rounded-md border border-blue-500/15">speaking clearly</span> but also on <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-555 dark:text-emerald-400 rounded-md border border-emerald-500/15">active listening</span>. When we listen with <span className="px-1.5 py-0.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-md border border-yellow-500/15">empathy</span> and understanding, we create a safe space for ideas to flow. Clear <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-555 dark:text-orange-400 rounded-md border border-orange-500/15">intent</span> helps in delivering messages that are <span className="px-1.5 py-0.5 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-md border border-teal-500/15">decoded</span> accurately, while <span className="px-1.5 py-0.5 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-md border border-teal-500/15">digesting</span> the information ensures better <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-555 dark:text-purple-400 rounded-md border border-purple-500/15">response</span> and <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-555 dark:text-emerald-400 rounded-md border border-emerald-500/15">action</span>. This cycle of clarity, empathy, and intent strengthens relationships and builds trust.
+                <div className="p-6 bg-slate-50 dark:bg-[#0a0f1d] border border-slate-150 dark:border-slate-800/50 rounded-2xl text-slate-855 dark:text-slate-200 leading-relaxed text-sm font-semibold whitespace-pre-line">
+                  {passage}
                 </div>
+
+                {passages.length > 1 && (
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      disabled={currentPassageIdx === 0}
+                      onClick={() => handlePassageChange(currentPassageIdx - 1)}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-850 dark:hover:text-white disabled:opacity-30 transition-all border border-slate-200 dark:border-slate-700 rounded-lg bg-transparent"
+                    >
+                      &larr; Prev Passage
+                    </button>
+                    <button
+                      type="button"
+                      disabled={currentPassageIdx === passages.length - 1}
+                      onClick={() => handlePassageChange(currentPassageIdx + 1)}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-850 dark:hover:text-white disabled:opacity-30 transition-all border border-slate-200 dark:border-slate-700 rounded-lg bg-transparent"
+                    >
+                      Next Passage &rarr;
+                    </button>
+                  </div>
+                )}
+              </div>
 
                 <div className="flex justify-between items-center">
                   <button 

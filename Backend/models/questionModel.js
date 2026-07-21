@@ -61,7 +61,7 @@ module.exports = {
   */
   getQuestionsByCategory: async (category) => {
     const res = await db.query(
-      'SELECT * FROM questions WHERE category = $1 ORDER BY created_at ASC',
+      'SELECT * FROM questions WHERE category = $1 ORDER BY created_at DESC',
       [category]
     );
     return res.rows;
