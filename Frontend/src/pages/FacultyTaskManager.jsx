@@ -297,8 +297,30 @@ const FacultyTaskManager = () => {
         </div>
       ) : tasks.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 64, color: 'var(--color-text-muted)', background: 'var(--color-surface)', borderRadius: 16, border: '1px solid var(--color-border)' }}>
-          <ClipboardList size={40} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <div style={{ fontSize: 16 }}>No tasks created yet. Click <strong>"Create Task"</strong> to get started.</div>
+          <ClipboardList size={45} style={{ marginBottom: 16, opacity: 0.4, color: 'var(--color-primary)' }} />
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', marginBottom: 8 }}>No tasks created yet</div>
+          <p style={{ fontSize: 14, color: 'var(--color-text-muted)', margin: '0 auto 20px', maxWidth: 400 }}>
+            Create tasks to assign mock interviews, group discussions, resume reviews, or custom goals to your students.
+          </p>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            style={{
+              padding: '10px 24px',
+              background: 'var(--color-primary)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+            }}
+          >
+            + Create Your First Task
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

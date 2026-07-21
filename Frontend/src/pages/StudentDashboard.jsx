@@ -73,7 +73,11 @@ const StudentDashboard = () => {
     };
   };
 
-  const scores = stats?.weeklyScores || [0, 0, 0, 0, 0];
+  const rawScores = stats?.weeklyScores || [0, 0, 0, 0, 0];
+  const scores = [...rawScores];
+  while (scores.length < 5) {
+    scores.push(0);
+  }
   const getY = (val) => 180 - ((val || 0) * 1.6);
   const y0 = getY(scores[0]);
   const y1 = getY(scores[1]);

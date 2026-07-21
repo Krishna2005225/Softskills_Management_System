@@ -10,6 +10,7 @@ Dependencies: react, facultyService, lucide-react, react-router-dom
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import facultyService from '../services/facultyService';
+import axiosClient from '../api/axiosClient';
 import {
   Users, ClipboardList, CheckCircle, TrendingUp, Search,
   UserPlus, UserMinus, Eye, BarChart2, BookOpen, AlertCircle,
@@ -89,6 +90,7 @@ const FacultyDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('my'); // 'my' | 'all'
   const [selectedBatch, setSelectedBatch] = useState('all');
@@ -133,10 +135,34 @@ const FacultyDashboard = () => {
     }
   }, []);
 
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await axiosClient.get('/notifications');
+      if (res.data.success) {
+        setNotifications(res.data.notifications || []);
+      }
+    } catch (err) {
+      console.error('Notifications fetch error:', err);
+    }
+  }, []);
+
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
+
   useEffect(() => {
     loadData();
     loadAnalytics();
-  }, [loadData, loadAnalytics]);
+    loadNotifications();
+  }, [loadData, loadAnalytics, loadNotifications]);
 
   const handleAssign = async (studentId) => {
     setAssigning(studentId);
@@ -286,44 +312,27 @@ const FacultyDashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {/* Weekly Activity Overview */}
-            <div style={{ flex: 1, minWidth: 300, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 18, padding: 20 }}>
+            {/* Score Distribution (Real Data) */}
+            <div style={{ flex: 1, minWidth: 300, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 18, padding: 20, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Weekly Activity Overview</h3>
-                <select style={{ ...inputStyle, width: 'fit-content', padding: '3px 8px' }}><option>This Week</option></select>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Aptitude Score Distribution</h3>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' }}>Assigned Students</span>
               </div>
               
-              {/* Micro-chart drawing (SVG Line Chart) */}
-              <div style={{ height: 160, display: 'flex', alignItems: 'flex-end', position: 'relative', marginTop: 10 }}>
-                <svg viewBox="0 0 100 30" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                  <defs>
-                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Grid Lines */}
-                  <line x1="0" y1="5" x2="100" y2="5" stroke="var(--color-border)" strokeWidth="0.1" strokeDasharray="1,1" />
-                  <line x1="0" y1="15" x2="100" y2="15" stroke="var(--color-border)" strokeWidth="0.1" strokeDasharray="1,1" />
-                  <line x1="0" y1="25" x2="100" y2="25" stroke="var(--color-border)" strokeWidth="0.1" strokeDasharray="1,1" />
-                  
-                  {/* Fill */}
-                  <path d="M 0 25 L 16 20 L 33 15 L 50 6 L 66 12 L 83 18 L 100 8 L 100 30 L 0 30 Z" fill="url(#chartGrad)" />
-                  {/* Path line */}
-                  <path d="M 0 25 L 16 20 L 33 15 L 50 6 L 66 12 L 83 18 L 100 8" fill="none" stroke="#3b82f6" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  
-                  {/* Circles */}
-                  <circle cx="0" cy="25" r="1" fill="#3b82f6" />
-                  <circle cx="16" cy="20" r="1" fill="#3b82f6" />
-                  <circle cx="33" cy="15" r="1" fill="#3b82f6" />
-                  <circle cx="50" cy="6" r="1" fill="#3b82f6" />
-                  <circle cx="66" cy="12" r="1" fill="#3b82f6" />
-                  <circle cx="83" cy="18" r="1" fill="#3b82f6" />
-                  <circle cx="100" cy="8" r="1" fill="#3b82f6" />
-                </svg>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-text-muted)', marginTop: 8 }}>
-                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, justifyContent: 'center' }}>
+                {Object.entries(analytics?.scoreDistribution || { '0-40': 0, '41-70': 0, '71-90': 0, '91-100': 0 }).map(([range, count]) => {
+                  const distTotal = Math.max(1, Object.values(analytics?.scoreDistribution || {}).reduce((a, b) => a + b, 0));
+                  const pct = Math.round((count / distTotal) * 100);
+                  return (
+                    <div key={range} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', width: 50 }}>{range} pts</span>
+                      <div style={{ flex: 1, height: 10, background: 'var(--color-border)', borderRadius: 5, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: 'var(--color-primary)', borderRadius: 5, transition: 'width 0.5s' }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--color-text)', width: 25, textAlign: 'right' }}>{count}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -336,15 +345,27 @@ const FacultyDashboard = () => {
                 <div style={{ position: 'relative', width: 100, height: 100 }}>
                   <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                     <circle cx="18" cy="18" r="15.915" fill="none" stroke="var(--color-border)" strokeWidth="3" />
-                    {/* Evaluated (Green) - 70% */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#22c55e" strokeWidth="3" strokeDasharray="70 30" strokeDashoffset="0" />
-                    {/* Pending (Orange) - 20% */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3" strokeDasharray="20 80" strokeDashoffset="-70" />
-                    {/* Overdue (Red) - 10% */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3" strokeDasharray="10 90" strokeDashoffset="-90" />
+                    {/* Evaluated (Green) */}
+                    <circle 
+                      cx="18" cy="18" r="15.915" fill="none" stroke="#22c55e" strokeWidth="3" 
+                      strokeDasharray={`${analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.completed || 0) / analytics.taskStats.total) * 100) : 0} ${100 - (analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.completed || 0) / analytics.taskStats.total) * 100) : 0)}`} 
+                      strokeDashoffset="0" 
+                    />
+                    {/* Pending (Orange) */}
+                    <circle 
+                      cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3" 
+                      strokeDasharray={`${analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.pending || 0) / analytics.taskStats.total) * 100) : 0} ${100 - (analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.pending || 0) / analytics.taskStats.total) * 100) : 0)}`} 
+                      strokeDashoffset={`-${analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.completed || 0) / analytics.taskStats.total) * 100) : 0}`} 
+                    />
+                    {/* Overdue (Red) */}
+                    <circle 
+                      cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3" 
+                      strokeDasharray={`${analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.overdue || 0) / analytics.taskStats.total) * 100) : 0} ${100 - (analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.overdue || 0) / analytics.taskStats.total) * 100) : 0)}`} 
+                      strokeDashoffset={`-${(analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.completed || 0) / analytics.taskStats.total) * 100) : 0) + (analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.pending || 0) / analytics.taskStats.total) * 100) : 0)}`} 
+                    />
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                    <span style={{ fontSize: 18, fontWeight: 900 }}>50</span>
+                    <span style={{ fontSize: 18, fontWeight: 900 }}>{analytics?.taskStats?.total ?? 0}</span>
                     <span style={{ fontSize: 9, color: 'var(--color-text-muted)', marginTop: 2 }}>Total</span>
                   </div>
                 </div>
@@ -352,15 +373,21 @@ const FacultyDashboard = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, background: '#22c55e', borderRadius: '50%' }} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>Completed: <strong>70% (35)</strong></span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Graded: <strong>{analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.completed || 0) / analytics.taskStats.total) * 100) : 0}% ({analytics?.taskStats?.completed || 0})</strong>
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, background: '#f59e0b', borderRadius: '50%' }} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>Pending: <strong>20% (10)</strong></span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Pending: <strong>{analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.pending || 0) / analytics.taskStats.total) * 100) : 0}% ({analytics?.taskStats?.pending || 0})</strong>
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, background: '#ef4444', borderRadius: '50%' }} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>Late: <strong>10% (5)</strong></span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Overdue: <strong>{analytics?.taskStats?.total > 0 ? Math.round(((analytics?.taskStats?.overdue || 0) / analytics.taskStats.total) * 100) : 0}% ({analytics?.taskStats?.overdue || 0})</strong>
+                    </span>
                   </div>
                 </div>
 
@@ -375,23 +402,29 @@ const FacultyDashboard = () => {
             <div style={{ flex: 1, minWidth: 280, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 18, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Recent Activity</h3>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer' }}>View All</span>
+                <span onClick={() => navigate('/faculty/tasks')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer' }}>Manage</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12 }}>
-                {[
-                  { time: '10:15 AM', type: 'evaluation', text: 'Krishna Kumar submitted Mock Interview', ago: '2 hours ago' },
-                  { time: '11:30 AM', type: 'discussion', text: 'Ravi Teja joined the Discussion', ago: '3 hours ago' },
-                  { time: '12:00 PM', type: 'creation', text: 'New Activity Created: Group Discussion', ago: '4 hours ago' },
-                  { time: '02:45 PM', type: 'resume', text: 'Arjun Completed Resume Review', ago: '5 hours ago' },
-                ].map((act, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: i < 3 ? '1px solid var(--color-border)' : 'none', paddingBottom: 10 }}>
-                    <div>
-                      <span style={{ color: 'var(--color-text-muted)', fontWeight: 600, marginRight: 6 }}>{act.time}</span>
-                      <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{act.text}</span>
-                    </div>
-                    <span style={{ fontSize: 10, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{act.ago}</span>
+                {(!analytics?.recentActivity || analytics.recentActivity.length === 0) ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No recent student activity log.
                   </div>
-                ))}
+                ) : (
+                  analytics.recentActivity.map((act, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: i < analytics.recentActivity.length - 1 ? '1px solid var(--color-border)' : 'none', paddingBottom: 10 }}>
+                      <div>
+                        <span style={{ color: 'var(--color-text)', fontWeight: 700 }}>{act.student_name}</span>
+                        <span style={{ color: 'var(--color-text-muted)', margin: '0 4px' }}>
+                          {act.status === 'SUBMITTED' ? 'submitted' : 'completed'}
+                        </span>
+                        <span style={{ color: 'var(--color-primary)', fontWeight: 650 }}>{act.task_title}</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', marginLeft: 8 }}>
+                        {formatTimeAgo(act.submitted_at || act.evaluated_at)}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -402,20 +435,21 @@ const FacultyDashboard = () => {
                 <span onClick={() => navigate('/notifications')} style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', cursor: 'pointer' }}>View All</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12 }}>
-                {[
-                  { text: '5 new submissions are waiting for evaluation.', ago: '10 min ago', color: '#6366f1' },
-                  { text: '2 students missed the deadline.', ago: '1 hour ago', color: '#ef4444' },
-                  { text: 'New discussion started in Leadership category.', ago: '2 hours ago', color: '#3b82f6' },
-                  { text: 'Weekly report is ready to download.', ago: '3 hours ago', color: '#22c55e' },
-                ].map((notif, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span style={{ width: 8, height: 8, background: notif.color, borderRadius: '50%', marginTop: 4, shrink: 0 }} />
-                    <div>
-                      <p style={{ color: 'var(--color-text)', margin: '0 0 2px', fontWeight: 600 }}>{notif.text}</p>
-                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{notif.ago}</span>
-                    </div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    No unread notifications.
                   </div>
-                ))}
+                ) : (
+                  notifications.slice(0, 4).map((notif, i) => (
+                    <div key={notif.notification_id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ width: 8, height: 8, background: notif.is_read ? 'var(--color-border)' : 'var(--color-primary)', borderRadius: '50%', marginTop: 4, shrink: 0 }} />
+                      <div>
+                        <p style={{ color: 'var(--color-text)', margin: '0 0 2px', fontWeight: 600 }}>{notif.message}</p>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{formatTimeAgo(notif.created_at)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

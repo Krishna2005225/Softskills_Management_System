@@ -150,7 +150,7 @@ module.exports = {
 
       // Basic info
       const profileResult = await db.query(`
-        SELECT u.user_id, u.name, u.email, u.department, u.phone,
+        SELECT u.user_id, u.name, u.email, u.department,
                s.roll_no, s.year, s.cgpa, s.placement_score
         FROM users u JOIN students s ON s.student_id = u.user_id
         WHERE u.user_id = $1
@@ -267,11 +267,13 @@ module.exports = {
       const top3 = sorted.slice(0, 3);
       const bottom3 = sorted.slice(-3).reverse();
 
-      // Task completion rate
+      // Task stats
       const taskResult = await db.query(`
         SELECT
-          COUNT(*) AS total_assigned,
-          COUNT(*) FILTER (WHERE status IN ('SUBMITTED', 'EVALUATED')) AS completed
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE status = 'SUBMITTED') AS pending,
+          COUNT(*) FILTER (WHERE status = 'EVALUATED') AS completed,
+          COUNT(*) FILTER (WHERE status = 'OVERDUE') AS overdue
         FROM task_assignments ta
         WHERE ta.student_id = ANY(
           SELECT student_id FROM faculty_student_assignments WHERE faculty_id = $1
@@ -279,9 +281,23 @@ module.exports = {
       `, [facultyId]);
 
       const taskStats = taskResult.rows[0];
-      const completionRate = taskStats.total_assigned > 0
-        ? Math.round((taskStats.completed / taskStats.total_assigned) * 100)
+      const completionRate = taskStats.total > 0
+        ? Math.round((taskStats.completed / taskStats.total) * 100)
         : 0;
+
+      // Real Recent Activity Feed
+      const recentActivityRes = await db.query(`
+        SELECT ta.submitted_at, ta.evaluated_at, ta.status, u.name AS student_name, t.title AS task_title
+        FROM task_assignments ta
+        JOIN users u ON u.user_id = ta.student_id
+        JOIN tasks t ON t.task_id = ta.task_id
+        WHERE ta.student_id = ANY(
+          SELECT student_id FROM faculty_student_assignments WHERE faculty_id = $1
+        )
+        AND ta.status IN ('SUBMITTED', 'EVALUATED')
+        ORDER BY COALESCE(ta.submitted_at, ta.evaluated_at) DESC
+        LIMIT 4
+      `, [facultyId]);
 
       res.json({
         success: true,
@@ -292,7 +308,8 @@ module.exports = {
           top3Performers: top3,
           bottom3Performers: bottom3,
           taskCompletionRate: completionRate,
-          taskStats
+          taskStats,
+          recentActivity: recentActivityRes.rows
         }
       });
     } catch (err) {
