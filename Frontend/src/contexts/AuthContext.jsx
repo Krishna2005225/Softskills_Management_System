@@ -52,13 +52,13 @@ export const AuthProvider = ({ children }) => {
   /*
   Authenticates credentials and registers session.
   */
-  const login = async (email, password) => {
+  const login = async (email, password, role) => {
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
+      const res = await axios.post('/api/auth/login', { email, password, role });
       if (res.data.success) {
         setToken(res.data.token);
         setUser(res.data.user);
-        return { success: true };
+        return { success: true, user: res.data.user };
       }
     } catch (error) {
       return { 

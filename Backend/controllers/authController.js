@@ -65,11 +65,15 @@ module.exports = {
   */
   login: async (req, res, next) => {
     try {
-      const { email, password } = req.body;
+      const { email, password, role } = req.body;
 
       const user = await User.findByEmail(email);
       if (!user) {
         return res.status(401).json({ success: false, message: 'Invalid credentials provided' });
+      }
+
+      if (role && user.role !== role) {
+        return res.status(401).json({ success: false, message: `Access denied. Selected role does not match account role.` });
       }
 
       const match = await bcrypt.compare(password, user.password_hash);

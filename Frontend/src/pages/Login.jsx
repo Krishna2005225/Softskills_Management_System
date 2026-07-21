@@ -16,6 +16,7 @@ const Login = () => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('STUDENT');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -25,23 +26,19 @@ const Login = () => {
     setLoading(true);
     setError('');
 
-    const res = await login(email, password);
+    const res = await login(email, password, role);
     setLoading(false);
 
     if (res.success) {
-      // Fetch profile context after successful auth to resolve role
-      const tokenPayload = localStorage.getItem('token');
-      if (tokenPayload) {
-        // Mock role route fallback
-        if (email.includes('admin')) {
-          navigate('/admin/dashboard');
-        } else if (email.includes('faculty')) {
-          navigate('/faculty/dashboard');
-        } else if (email.includes('placement')) {
-          navigate('/placement/dashboard');
-        } else {
-          navigate('/student/dashboard');
-        }
+      const userRole = res.user?.role || role;
+      if (userRole === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else if (userRole === 'FACULTY') {
+        navigate('/faculty/dashboard');
+      } else if (userRole === 'PLACEMENT_OFFICER') {
+        navigate('/placement/dashboard');
+      } else {
+        navigate('/student/dashboard');
       }
     } else {
       setError(res.message);
@@ -60,6 +57,28 @@ const Login = () => {
             register a new profile
           </Link>
         </p>
+      </div>
+
+      {/* Role Selector Tabs */}
+      <div className="flex gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-2xl">
+        {[
+          { id: 'STUDENT', label: 'Student' },
+          { id: 'FACULTY', label: 'Faculty' },
+          { id: 'ADMIN', label: 'Admin' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setRole(tab.id)}
+            className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-300 transform active:scale-95 ${
+              role === tab.id
+                ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 font-extrabold'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && (
