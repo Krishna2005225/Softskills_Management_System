@@ -198,7 +198,7 @@ module.exports = {
 
       // Detailed tasks list
       const taskListResult = await db.query(`
-        SELECT ta.assignment_id, ta.task_id, ta.status, ta.score, ta.feedback,
+        SELECT ta.id AS assignment_id, ta.task_id, ta.status, ta.score, ta.feedback,
                ta.submission_text, ta.submission_url, ta.submitted_at,
                t.title, t.task_type, t.due_date, t.max_score
         FROM task_assignments ta
