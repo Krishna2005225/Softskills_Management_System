@@ -174,9 +174,9 @@ module.exports = {
         FROM mock_interviews WHERE student_id = $1 AND status = 'COMPLETED'
       `, [id]);
 
-      // Aptitude average
+      // Aptitude average (scaled to percentage 0-100)
       const aptitudeResult = await db.query(`
-        SELECT ROUND(AVG(score)) AS avg_score, COUNT(*) AS count
+        SELECT ROUND(AVG((score::float / total_questions) * 100)) AS avg_score, COUNT(*) AS count
         FROM aptitude_tests WHERE student_id = $1
       `, [id]);
 

@@ -24,13 +24,16 @@ module.exports = {
       // Fetch dynamic questions from PostgreSQL
       const dbQuestions = await Question.getQuestionsByCategory(category.toUpperCase());
       
+      // Filter out subjective passages for Aptitude timed tests
+      const mcqQuestions = dbQuestions.filter(q => q.options && q.options.length > 0);
+      
       // Fallback placeholder questions if database is empty for this category
       const fallbackQuestions = [
         { question_id: 'apt-1', question_text: 'Find the next term in: 3, 5, 9, 17, 33...', options: ['65', '60', '55', '50'], correct_answer: '65' },
         { question_id: 'apt-2', question_text: 'A train 100m long passes a bridge in 10s at 72km/h. Bridge length is...', options: ['100m', '150m', '200m', '250m'], correct_answer: '100m' }
       ];
 
-      const questionsList = dbQuestions.length > 0 ? dbQuestions : fallbackQuestions;
+      const questionsList = mcqQuestions.length > 0 ? mcqQuestions : fallbackQuestions;
 
       return res.status(200).json({
         success: true,
@@ -51,11 +54,9 @@ module.exports = {
       const { score, totalQuestions, category } = req.body;
       const record = await Aptitude.submitTestResult(req.user.user_id, score, totalQuestions, category);
 
-      // Compute score adjustments
-      const percentage = (score / totalQuestions) * 100;
+      // Recalculate dynamic statistics and update student placement score
       const stats = await Student.getDashboardStats(req.user.user_id);
-      const newPlacementScore = Math.min(100, Math.round((stats.placementScore + percentage) / 2));
-      await Student.updatePlacementScore(req.user.user_id, newPlacementScore);
+      const newPlacementScore = stats.placementScore || 0;
 
       return res.status(200).json({
         success: true,
