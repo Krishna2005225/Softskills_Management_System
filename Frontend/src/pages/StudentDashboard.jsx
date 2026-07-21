@@ -28,6 +28,9 @@ const StudentDashboard = () => {
   const [history, setHistory] = useState([]);
   const timerRef = useRef(null);
 
+  // Avatar state
+  const [profilePic, setProfilePic] = useState('https://api.dicebear.com/7.x/adventurer/svg?seed=Nezuko');
+
   const loadStudySession = async () => {
     try {
       const res = await studyService.getActiveSession();
@@ -80,6 +83,13 @@ const StudentDashboard = () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [activeSession]);
+
+  useEffect(() => {
+    if (stats?.profile?.student_id) {
+      const saved = localStorage.getItem(`profilePic_${stats.profile.student_id}`);
+      if (saved) setProfilePic(saved);
+    }
+  }, [stats]);
 
   const formatTime = (secs) => {
     const h = Math.floor(secs / 3600);
@@ -174,17 +184,34 @@ const StudentDashboard = () => {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Welcome, {stats?.profile?.name || 'Student'}! 👋
-          </h1>
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
-            Here is your placement readiness check for this week.
-          </p>
+      <div className="p-6 bg-white dark:bg-[#111625]/90 border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-lg relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-500/10 to-indigo-500/0 rounded-full blur-xl pointer-events-none" />
+
+        <div className="flex items-center gap-5">
+          {/* Avatar Profile Frame */}
+          <div 
+            className="h-20 w-20 rounded-full overflow-hidden border-4 shadow-md flex items-center justify-center bg-slate-100 dark:bg-slate-900 shrink-0 relative animate-fadeIn"
+            style={{ borderColor: 'var(--color-primary)' }}
+          >
+            <img src={profilePic} alt="Avatar" className="w-full h-full object-cover" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-505 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/15">
+              Learning Portal Active
+            </span>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-1.5 leading-tight">
+              Hello, {stats?.profile?.name?.split(' ')[0]?.toUpperCase() || 'STUDENT'}!
+            </h1>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+              Great, your learning is on track
+            </p>
+          </div>
         </div>
-        <div className="text-xs font-black tracking-wider px-4 py-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl shadow-sm">
-          Roll No: {stats?.profile?.roll_no || 'N/A'}
+
+        <div className="flex flex-col items-end gap-2 shrink-0 w-full md:w-auto">
+          <div className="text-xs font-black tracking-wider px-4 py-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl shadow-sm w-full md:w-auto text-center md:text-right">
+            Roll No: {stats?.profile?.roll_no || 'N/A'}
+          </div>
         </div>
       </div>
 

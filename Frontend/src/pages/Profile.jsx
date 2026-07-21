@@ -43,13 +43,17 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
+  // Avatar Selection States
+  const [profilePic, setProfilePic] = useState('https://api.dicebear.com/7.x/adventurer/svg?seed=Nezuko');
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
   // Mentor Selection States
   const [faculties, setFaculties] = useState([]);
   const [selectedFaculty, setSelectedFaculty] = useState('');
   const [currentMentor, setCurrentMentor] = useState(null);
   const [mentorSaving, setMentorSaving] = useState(false);
-  const [mentorSuccess, setMentorSuccess] = useState('');
   const [mentorError, setMentorError] = useState('');
+  const [mentorSuccess, setMentorSuccess] = useState('');
 
   // --- PASSWORD CHANGE MODAL STATES ---
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -113,6 +117,51 @@ const Profile = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    if (profile) {
+      const saved = localStorage.getItem(`profilePic_${profile.user_id}`);
+      if (saved) setProfilePic(saved);
+    }
+  }, [profile]);
+
+  const avatarPresets = [
+    { name: 'Nezuko Seed', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Nezuko' },
+    { name: 'Felix', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
+    { name: 'Aneka', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka' },
+    { name: 'Tech', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Tech' },
+    { name: 'Game', url: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Game' },
+    { name: 'Creative', url: 'https://api.dicebear.com/7.x/big-ears/svg?seed=Creative' }
+  ];
+
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      alert('Avatar image must be under 1MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result;
+      setProfilePic(base64);
+      if (profile) {
+        localStorage.setItem(`profilePic_${profile.user_id}`, base64);
+        window.dispatchEvent(new Event('storage'));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSelectPreset = (url) => {
+    setProfilePic(url);
+    if (profile) {
+      localStorage.setItem(`profilePic_${profile.user_id}`, url);
+      window.dispatchEvent(new Event('storage'));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -420,10 +469,71 @@ const Profile = () => {
         <div className="lg:col-span-1">
           <div className="p-8 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-md flex flex-col items-center text-center">
             
-            {/* Avatar Circle */}
-            <div className="h-24 w-24 bg-gradient-to-tr from-blue-600 to-indigo-650 text-white text-3xl font-black rounded-full flex items-center justify-center shadow-lg shadow-blue-500/10 mb-4 select-none">
-              {name.charAt(0).toUpperCase()}
+            {/* Avatar Profile Pic */}
+            <div className="relative group flex flex-col items-center">
+              <div 
+                className="h-28 w-28 rounded-full overflow-hidden border-4 shadow-lg transition-transform duration-300 transform group-hover:scale-105 flex items-center justify-center bg-slate-100 dark:bg-slate-900 select-none relative"
+                style={{ borderColor: 'var(--color-primary)' }}
+              >
+                <img src={profilePic} alt="Avatar" className="w-full h-full object-cover" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+                className="mt-3 text-xs font-black uppercase tracking-wider px-3.5 py-1.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-white text-slate-700 dark:text-slate-350 hover:bg-slate-50 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Edit className="w-3.5 h-3.5 text-blue-505" />
+                Change Profile Pic
+              </button>
             </div>
+
+            {/* Avatar Selector Dropdown Panel */}
+            {showAvatarPicker && (
+              <div className="w-full mt-4 p-4 border border-slate-200/60 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl space-y-4 animate-fadeIn">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-extrabold text-xs text-slate-700 dark:text-slate-200">Select Preset Avatar</h4>
+                  <button 
+                    type="button"
+                    onClick={() => setShowAvatarPicker(false)}
+                    className="text-slate-455 hover:text-slate-600 text-xs font-bold"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {/* Preset Avatars Grid */}
+                <div className="grid grid-cols-3 gap-2">
+                  {avatarPresets.map(preset => {
+                    const isSelected = profilePic === preset.url;
+                    return (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset.url)}
+                        className={`p-1 bg-white dark:bg-slate-900 rounded-xl border-2 transition-transform transform active:scale-95 flex items-center justify-center shadow-sm ${
+                          isSelected ? 'border-blue-550 scale-105' : 'border-transparent hover:border-slate-200'
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.name} className="w-10 h-10 object-contain" />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom File Upload Option */}
+                <div className="pt-3 border-t border-slate-200/50 dark:border-slate-800/40">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 text-left">
+                    Or Upload Custom Photo
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:bg-blue-500/10 file:text-blue-600 hover:file:bg-blue-500/20 cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
             
             {/* Name & Role */}
             <h2 className="font-extrabold text-xl text-slate-900 dark:text-slate-100 font-sans">{name}</h2>

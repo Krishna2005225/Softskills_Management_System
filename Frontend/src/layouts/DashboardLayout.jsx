@@ -10,12 +10,12 @@ Dependencies: react, react-router-dom, useAuth, ThemeContext, lucide-react
 import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { ThemeContext } from '../contexts/ThemeContext';
+import { ThemeContext, themesList } from '../contexts/ThemeContext';
 import axiosClient from '../api/axiosClient';
 import { 
   LayoutDashboard, User, Settings, LogOut, Bell, Sun, Moon, 
   Menu, X, BookOpen, GraduationCap, Users, FileText, CheckSquare, Award, BarChart3,
-  Lightbulb, Crown, ClipboardList
+  Lightbulb, Crown, ClipboardList, Palette
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -23,8 +23,27 @@ const DashboardLayout = () => {
   const { darkMode, toggleTheme } = useContext(ThemeContext);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Theme and Avatar selector states
+  const [themePopupOpen, setThemePopupOpen] = useState(false);
+  const [profilePic, setProfilePic] = useState(
+    localStorage.getItem(`profilePic_${user?.id}`) || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Nezuko'
+  );
+
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const syncPic = () => {
+      if (user) {
+        const pic = localStorage.getItem(`profilePic_${user.id}`);
+        if (pic) setProfilePic(pic);
+      }
+    };
+    syncPic();
+    window.addEventListener('storage', syncPic);
+    return () => window.removeEventListener('storage', syncPic);
+  }, [user]);
 
   // Fetch unread notification count
   useEffect(() => {
@@ -109,7 +128,14 @@ const DashboardLayout = () => {
   const links = getSidebarLinks();
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 transition-colors duration-200 relative overflow-hidden">
+      {/* Premium Background Grid Pattern */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06] overflow-hidden" 
+           style={{ 
+             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%2322c55e' stroke-width='1.5'%3E%3Ccircle cx='40' cy='40' r='10'/%3E%3Cpath d='M10 10l15 15M60 10l-15 15M10 60l15-15M60 60l-15-15'/%3E%3C/g%3E%3C/svg%3E")`,
+             backgroundSize: '160px 160px' 
+           }} 
+      />
       
       {/* Sidebar - Desktop */}
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform md:translate-x-0 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:relative'}`}>
@@ -213,6 +239,75 @@ const DashboardLayout = () => {
               {darkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
             </button>
 
+            {/* Theme Colors Palette Button */}
+            <div className="relative">
+              <button 
+                onClick={() => setThemePopupOpen(!themePopupOpen)}
+                className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors relative"
+                title="Theme Colors"
+              >
+                <Palette className="w-5 h-5 text-indigo-500" />
+              </button>
+
+              {themePopupOpen && (
+                <div className="absolute right-0 mt-3 w-72 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl z-50 animate-fadeIn space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">Theme Colors</h3>
+                    <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md">13 Themes</span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3">
+                    {Object.keys(themesList).map(key => {
+                      const t = themesList[key];
+                      const isSelected = accentColor === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setAccentColor(key)}
+                          style={{ backgroundColor: t.primary }}
+                          title={t.name}
+                          className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-900 relative transition-transform transform hover:scale-110 active:scale-95 shadow-md flex items-center justify-center"
+                        >
+                          {isSelected && (
+                            <svg className="w-5 h-5 text-white stroke-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {/* Custom Color Selector Button */}
+                    <div className="w-10 h-10 rounded-full relative flex items-center justify-center border-2 border-white dark:border-slate-900 overflow-hidden shadow-md">
+                      <input
+                        type="color"
+                        value={customColor}
+                        onChange={(e) => {
+                          setAccentColor('custom');
+                          setCustomColor(e.target.value);
+                        }}
+                        className="absolute inset-0 w-full h-full cursor-pointer scale-150"
+                        title="Custom Color Theme"
+                      />
+                      {accentColor === 'custom' && (
+                        <svg className="w-5 h-5 text-white stroke-2 absolute pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-850 flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-lg accent-bg-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Active Accent</p>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 capitalize">{accentColor} theme</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Notifications */}
             <Link 
               to="/notifications" 
@@ -231,8 +326,11 @@ const DashboardLayout = () => {
 
             {/* User Profile Summary */}
             <Link to="/profile" className="flex items-center gap-3 hover:opacity-90">
-              <div className="h-9 w-9 bg-blue-600 text-white font-bold rounded-full flex items-center justify-center text-sm shadow">
-                {user?.name?.charAt(0) || 'U'}
+              <div 
+                className="h-9 w-9 rounded-full overflow-hidden border-2 shadow flex items-center justify-center bg-slate-100 shrink-0"
+                style={{ borderColor: 'var(--color-primary)' }}
+              >
+                <img src={profilePic} alt="Avatar" className="w-full h-full object-cover" />
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-sm font-bold text-slate-800 dark:text-gray-200 leading-none">{user?.name || 'Guest User'}</p>
