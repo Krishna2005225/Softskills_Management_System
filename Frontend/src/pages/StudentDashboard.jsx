@@ -101,7 +101,7 @@ const StudentDashboard = () => {
         loadHistory();
       }
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to check-in.');
+      alert(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to check-in.');
     }
   };
 
@@ -114,7 +114,7 @@ const StudentDashboard = () => {
         loadHistory();
       }
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to check-out.');
+      alert(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to check-out.');
     }
   };
 
