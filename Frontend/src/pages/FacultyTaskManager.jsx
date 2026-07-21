@@ -557,6 +557,19 @@ const FacultyTaskManager = () => {
 
       <style>{`
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        
+        /* Tactile interactive button animations */
+        button {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        button:hover {
+          transform: translateY(-1.5px);
+          box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15);
+          opacity: 0.95;
+        }
+        button:active {
+          transform: translateY(0px) scale(0.97);
+        }
       `}</style>
     </div>
   );

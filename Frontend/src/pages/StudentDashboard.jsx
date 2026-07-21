@@ -7,19 +7,52 @@ Dependencies: react, studentService, Card, LoadingSkeleton, lucide-react
 ------------------------------------------------
 */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import studentService from '../services/studentService';
+import studyService from '../services/studyService';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import { 
   Award, UserCheck, TrendingUp, Calendar, ArrowRight, ChevronRight, 
-  BookOpen, GraduationCap, Users, Sparkles, MessageSquare 
+  BookOpen, GraduationCap, Users, Sparkles, MessageSquare, Play, Square, Clock
 } from 'lucide-react';
 
 const StudentDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Study timer states
+  const [activeSession, setActiveSession] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [history, setHistory] = useState([]);
+  const timerRef = useRef(null);
+
+  const loadStudySession = async () => {
+    try {
+      const res = await studyService.getActiveSession();
+      if (res.success && res.activeSession) {
+        setActiveSession(res.activeSession);
+        const start = new Date(res.activeSession.start_time);
+        const diff = Math.floor((new Date() - start) / 1000);
+        setElapsedSeconds(diff > 0 ? diff : 0);
+      } else {
+        setActiveSession(null);
+        setElapsedSeconds(0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadHistory = async () => {
+    try {
+      const res = await studyService.getHistory();
+      if (res.success) setHistory(res.history || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     studentService.getDashboardStats()
@@ -30,7 +63,60 @@ const StudentDashboard = () => {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    loadStudySession();
+    loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (activeSession) {
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [activeSession]);
+
+  const formatTime = (secs) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return [
+      h.toString().padStart(2, '0'),
+      m.toString().padStart(2, '0'),
+      s.toString().padStart(2, '0')
+    ].join(':');
+  };
+
+  const handleCheckIn = async () => {
+    try {
+      const res = await studyService.checkIn();
+      if (res.success) {
+        setActiveSession(res.session);
+        setElapsedSeconds(0);
+        loadHistory();
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to check-in.');
+    }
+  };
+
+  const handleCheckOut = async () => {
+    try {
+      const res = await studyService.checkOut();
+      if (res.success) {
+        setActiveSession(null);
+        setElapsedSeconds(0);
+        loadHistory();
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to check-out.');
+    }
+  };
 
   if (loading) {
     return (
@@ -99,6 +185,59 @@ const StudentDashboard = () => {
         </div>
         <div className="text-xs font-black tracking-wider px-4 py-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl shadow-sm">
           Roll No: {stats?.profile?.roll_no || 'N/A'}
+        </div>
+      </div>
+
+      {/* Study Session Tracker Card */}
+      <div className="p-6 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-3xl shadow-lg relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="absolute -right-16 -top-16 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center gap-5">
+          <div className="p-4 bg-white/15 rounded-2xl border border-white/20 flex shrink-0">
+            <Clock className="w-8 h-8 animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black uppercase tracking-wider">Placement Study Focus Timer</h2>
+            {activeSession ? (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+                <span className="text-xs font-bold text-emerald-300">Session active since {new Date(activeSession.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-indigo-100 font-semibold mt-1">
+                Ready to prepare? Start your check-in timer to count study hours towards your placement metrics.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Action / Timer Panel */}
+        <div className="flex items-center gap-6">
+          {activeSession && (
+            <div className="text-3xl font-black font-mono tracking-widest bg-black/20 px-5 py-2.5 rounded-2xl border border-white/10 select-none animate-pulse">
+              {formatTime(elapsedSeconds)}
+            </div>
+          )}
+          
+          <button
+            onClick={activeSession ? handleCheckOut : handleCheckIn}
+            className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 transform hover:scale-[1.03] active:scale-95 ${
+              activeSession 
+                ? 'bg-rose-500 hover:bg-rose-600 shadow-md text-white' 
+                : 'bg-white text-indigo-700 hover:bg-slate-100 shadow-lg'
+            }`}
+          >
+            {activeSession ? (
+              <>
+                <Square className="w-4 h-4 fill-current" /> Check-Out
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current" /> Check-In Focus
+              </>
+            )}
+          </button>
         </div>
       </div>
 

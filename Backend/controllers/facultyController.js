@@ -186,6 +186,12 @@ module.exports = {
         FROM gd_scores gs WHERE gs.student_id = $1
       `, [id]);
 
+      // Total Study Time
+      const studyResult = await db.query(`
+        SELECT COALESCE(SUM(duration), 0)::int AS total_duration
+        FROM study_sessions WHERE student_id = $1
+      `, [id]);
+
       // Task stats
       const taskResult = await db.query(`
         SELECT
@@ -216,6 +222,7 @@ module.exports = {
           aptitude: aptitudeResult.rows[0],
           gd: gdResult.rows[0]
         },
+        studyTime: studyResult.rows[0].total_duration,
         tasks: taskResult.rows[0],
         taskList: taskListResult.rows
       });

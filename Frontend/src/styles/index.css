@@ -17,6 +17,23 @@ Dependencies: tailwindcss
   }
 }
 
+:root {
+  --color-primary: var(--color-accent, #8b5cf6);
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+}
+
+.dark {
+  --color-bg: #0b0f19;
+  --color-surface: #111625;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-border: #1e293b;
+}
+
 @layer components {
   /* Premium Glassmorphism Cards */
   .glass-card {

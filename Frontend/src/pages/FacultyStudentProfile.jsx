@@ -209,6 +209,7 @@ const FacultyStudentProfile = () => {
             <MetricCard icon={Brain} label="Aptitude Avg" value={performance?.aptitude?.avg_score} sub={`${performance?.aptitude?.count || 0} tests`} color="#3b82f6" />
             <MetricCard icon={MessageSquare} label="GD Score Avg" value={performance?.gd?.avg_score} sub={`${performance?.gd?.count || 0} sessions`} color="#8b5cf6" />
             <MetricCard icon={FileText} label="Resume ATS Score" value={resume?.ats_score} sub={resume ? 'Last upload' : 'No resume yet'} color="#22c55e" />
+            <MetricCard icon={Clock} label="Total Study Time" value={data.studyTime ? `${(data.studyTime / 60).toFixed(1)} hrs` : '0.0 hrs'} sub={`${data.studyTime || 0} minutes total`} color="#f59e0b" />
           </div>
 
           {/* Score Bars */}

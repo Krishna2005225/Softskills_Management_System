@@ -11,6 +11,7 @@ const express = require('express');
 const router = express.Router();
 const studentController = require('../controllers/studentController');
 const taskController = require('../controllers/taskController');
+const studyController = require('../controllers/studyController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -64,5 +65,13 @@ Select/update faculty advisor.
 Body: { facultyId }
 */
 router.post('/assign-faculty', protect, authorize('STUDENT'), studentController.assignFaculty);
+
+/*
+Study session tracking endpoints
+*/
+router.get('/study-session/active', protect, authorize('STUDENT'), studyController.getActiveSession);
+router.post('/study-session/checkin', protect, authorize('STUDENT'), studyController.checkIn);
+router.post('/study-session/checkout', protect, authorize('STUDENT'), studyController.checkOut);
+router.get('/study-session/history', protect, authorize('STUDENT'), studyController.getHistory);
 
 module.exports = router;
