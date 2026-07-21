@@ -1,203 +1,381 @@
 /*
 ------------------------------------------------
 File: facultyController.js
-Purpose: Handles faculty evaluations and activity mappings.
-Responsibilities: Logs student grades, creates activities, and checks evaluations pending queue.
-Dependencies: Activity, Student, MockInterview, GroupDiscussion
+Purpose: Faculty management APIs — student viewing, batch assignment, and performance tracking.
+Responsibilities: Get all students, assign/unassign students to faculty, view student profiles, batch analytics.
+Dependencies: db.js, authMiddleware.js
 ------------------------------------------------
 */
 
-const Activity = require('../models/Activity');
-const Student = require('../models/Student');
-const GroupDiscussion = require('../models/GroupDiscussion');
-const MockInterview = require('../models/MockInterview');
-const Question = require('../models/questionModel');
-const Answer = require('../models/answerModel');
+const db = require('../config/db');
 
 module.exports = {
-  /*
-  POST /api/faculty/evaluation
-  Evaluates students for group discussions.
-  */
-  evaluateStudent: async (req, res, next) => {
-    try {
-      const { student_id, gd_id, score, feedback } = req.body;
-      const scoreRecord = await GroupDiscussion.scoreParticipant(student_id, gd_id, score, feedback);
-      
-      // Fetch current score details to update cumulative student score
-      const stats = await Student.getDashboardStats(student_id);
-      const newCumulative = Math.min(100, Math.round((stats.placementScore + score) / 2));
-      await Student.updatePlacementScore(student_id, newCumulative);
 
-      return res.status(200).json({
-        success: true,
-        message: 'Evaluation saved successfully',
-        record: scoreRecord
-      });
-    } catch (error) {
-      return next(error);
+  /*
+  Get all students in the system (Faculty or Admin access).
+  Returns: list of all student users with profile + performance data.
+  */
+  getAllStudents: async (req, res) => {
+    try {
+      const result = await db.query(`
+        SELECT
+          u.user_id,
+          u.name,
+          u.email,
+          u.department,
+          s.roll_no,
+          s.year,
+          s.cgpa,
+          s.placement_score,
+          (
+            SELECT COUNT(*) FROM task_assignments ta
+            WHERE ta.student_id = s.student_id AND ta.status NOT IN ('EVALUATED')
+          ) AS pending_tasks,
+          (
+            SELECT MAX(r.created_at) FROM resumes r WHERE r.student_id = s.student_id
+          ) AS last_active
+        FROM users u
+        JOIN students s ON s.student_id = u.user_id
+        WHERE u.role = 'STUDENT'
+        ORDER BY s.placement_score DESC
+      `);
+      res.json({ success: true, students: result.rows });
+    } catch (err) {
+      console.error('getAllStudents error:', err);
+      res.status(500).json({ error: 'Failed to fetch students' });
     }
   },
 
   /*
-  POST /api/faculty/activities
-  Creates soft skills practice activity assignments.
+  Get only students assigned to the logged-in faculty.
+  Returns: list of assigned student profiles with task stats.
   */
-  assignActivity: async (req, res, next) => {
+  getMyStudents: async (req, res) => {
     try {
-      const { title, description, due_date, category } = req.body;
-      const activity = await Activity.createActivity(
-        title, 
-        description, 
-        due_date, 
-        req.user.user_id, 
-        category
-      );
-      return res.status(201).json({
-        success: true,
-        message: 'Activity assigned successfully',
-        activity
-      });
-    } catch (error) {
-      return next(error);
+      const facultyId = req.user.user_id;
+      const result = await db.query(`
+        SELECT
+          u.user_id,
+          u.name,
+          u.email,
+          u.department,
+          s.roll_no,
+          s.year,
+          s.cgpa,
+          s.placement_score,
+          (
+            SELECT COUNT(*) FROM task_assignments ta
+            WHERE ta.student_id = s.student_id AND ta.status = 'ASSIGNED'
+          ) AS pending_tasks,
+          (
+            SELECT COUNT(*) FROM task_assignments ta
+            WHERE ta.student_id = s.student_id AND ta.status = 'EVALUATED'
+          ) AS completed_tasks,
+          fsa.assigned_at
+        FROM faculty_student_assignments fsa
+        JOIN users u ON u.user_id = fsa.student_id
+        JOIN students s ON s.student_id = fsa.student_id
+        WHERE fsa.faculty_id = $1
+        ORDER BY s.placement_score DESC
+      `, [facultyId]);
+      res.json({ success: true, students: result.rows });
+    } catch (err) {
+      console.error('getMyStudents error:', err);
+      res.status(500).json({ error: 'Failed to fetch assigned students' });
     }
   },
 
   /*
-  GET /api/faculty/pending-evaluations
-  Returns list of student uploads awaiting evaluation.
+  Assign a student to the logged-in faculty's batch.
+  Body: { studentId }
   */
-  listPendingEvaluations: async (req, res, next) => {
+  assignStudent: async (req, res) => {
     try {
-      const db = require('../config/db');
-      
-      // Query pending mock interviews
-      const mockRes = await db.query(
-        `SELECT 
-           m.interview_id AS id, 
-           u.name AS "studentName", 
-           'Mock Interview Video Upload' AS "activityTitle", 
-           'MOCK_INTERVIEW' AS type,
-           m.date AS "submittedAt",
-           m.recording_url
-         FROM mock_interviews m
-         JOIN users u ON m.student_id = u.user_id
-         WHERE m.status = 'PENDING'
-         ORDER BY m.date ASC`
+      const facultyId = req.user.user_id;
+      const { studentId } = req.body;
+      if (!studentId) return res.status(400).json({ error: 'studentId is required' });
+
+      await db.query(`
+        INSERT INTO faculty_student_assignments (faculty_id, student_id)
+        VALUES ($1, $2)
+        ON CONFLICT (faculty_id, student_id) DO NOTHING
+      `, [facultyId, studentId]);
+
+      // Send notification to student
+      const facultyResult = await db.query(
+        'SELECT name FROM users WHERE user_id = $1', [facultyId]
       );
+      const facultyName = facultyResult.rows[0]?.name || 'A faculty member';
+      await db.query(`
+        INSERT INTO notifications (user_id, message)
+        VALUES ($1, $2)
+      `, [studentId, `You have been added to ${facultyName}'s batch.`]);
 
-      // Query pending written subjective answers
-      const writtenRes = await db.query(
-        `SELECT 
-           sa.answer_id AS id, 
-           u.name AS "studentName", 
-           q.question_text AS "activityTitle", 
-           'WRITTEN_ANSWER' AS type,
-           sa.created_at AS "submittedAt"
-         FROM student_answers sa
-         JOIN questions q ON sa.question_id = q.question_id
-         JOIN users u ON sa.student_id = u.user_id
-         WHERE sa.score IS NULL
-         ORDER BY sa.created_at ASC`
-      );
+      res.json({ success: true, message: 'Student assigned to your batch.' });
+    } catch (err) {
+      console.error('assignStudent error:', err);
+      res.status(500).json({ error: 'Failed to assign student' });
+    }
+  },
 
-      const pending = [...mockRes.rows, ...writtenRes.rows];
+  /*
+  Unassign a student from the logged-in faculty's batch.
+  Params: studentId
+  */
+  unassignStudent: async (req, res) => {
+    try {
+      const facultyId = req.user.user_id;
+      const { studentId } = req.params;
 
-      const fallback = [
-        {
-          id: 'mock-int-fallback',
-          studentName: 'Krishna Kumar',
-          activityTitle: 'Mock Interview - Tell me about yourself',
-          type: 'MOCK_INTERVIEW',
-          submittedAt: new Date()
+      await db.query(`
+        DELETE FROM faculty_student_assignments
+        WHERE faculty_id = $1 AND student_id = $2
+      `, [facultyId, studentId]);
+
+      res.json({ success: true, message: 'Student removed from your batch.' });
+    } catch (err) {
+      console.error('unassignStudent error:', err);
+      res.status(500).json({ error: 'Failed to unassign student' });
+    }
+  },
+
+  /*
+  Get full profile of a single student.
+  Params: id (student user_id)
+  Returns: Profile, latest resume ATS score, performance averages.
+  */
+  getStudentProfile: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Basic info
+      const profileResult = await db.query(`
+        SELECT u.user_id, u.name, u.email, u.department, u.phone,
+               s.roll_no, s.year, s.cgpa, s.placement_score
+        FROM users u JOIN students s ON s.student_id = u.user_id
+        WHERE u.user_id = $1
+      `, [id]);
+
+      if (!profileResult.rows.length) {
+        return res.status(404).json({ error: 'Student not found' });
+      }
+      const profile = profileResult.rows[0];
+
+      // Latest resume ATS score
+      const resumeResult = await db.query(`
+        SELECT ats_score, ai_suggestions, created_at
+        FROM resumes WHERE student_id = $1
+        ORDER BY created_at DESC LIMIT 1
+      `, [id]);
+
+      // Mock interview average
+      const interviewResult = await db.query(`
+        SELECT ROUND(AVG(score)) AS avg_score, COUNT(*) AS count
+        FROM mock_interviews WHERE student_id = $1 AND status = 'COMPLETED'
+      `, [id]);
+
+      // Aptitude average
+      const aptitudeResult = await db.query(`
+        SELECT ROUND(AVG(score)) AS avg_score, COUNT(*) AS count
+        FROM aptitude_tests WHERE student_id = $1
+      `, [id]);
+
+      // GD average
+      const gdResult = await db.query(`
+        SELECT ROUND(AVG(gs.score)) AS avg_score, COUNT(*) AS count
+        FROM gd_scores gs WHERE gs.student_id = $1
+      `, [id]);
+
+      // Task stats
+      const taskResult = await db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'ASSIGNED') AS assigned,
+          COUNT(*) FILTER (WHERE status = 'SUBMITTED') AS submitted,
+          COUNT(*) FILTER (WHERE status = 'EVALUATED') AS evaluated,
+          COUNT(*) FILTER (WHERE status = 'OVERDUE') AS overdue
+        FROM task_assignments WHERE student_id = $1
+      `, [id]);
+
+      // Detailed tasks list
+      const taskListResult = await db.query(`
+        SELECT ta.assignment_id, ta.task_id, ta.status, ta.score, ta.feedback,
+               ta.submission_text, ta.submission_url, ta.submitted_at,
+               t.title, t.task_type, t.due_date, t.max_score
+        FROM task_assignments ta
+        JOIN tasks t ON ta.task_id = t.task_id
+        WHERE ta.student_id = $1
+        ORDER BY t.due_date DESC, t.created_at DESC
+      `, [id]);
+
+      res.json({
+        success: true,
+        profile,
+        resume: resumeResult.rows[0] || null,
+        performance: {
+          interview: interviewResult.rows[0],
+          aptitude: aptitudeResult.rows[0],
+          gd: gdResult.rows[0]
+        },
+        tasks: taskResult.rows[0],
+        taskList: taskListResult.rows
+      });
+    } catch (err) {
+      console.error('getStudentProfile error:', err);
+      res.status(500).json({ error: 'Failed to fetch student profile' });
+    }
+  },
+
+  /*
+  Get batch analytics for all students assigned to the logged-in faculty.
+  Returns: Aggregated stats, score distribution, top/bottom performers.
+  */
+  getBatchAnalytics: async (req, res) => {
+    try {
+      const facultyId = req.user.user_id;
+
+      // All assigned students
+      const studentsResult = await db.query(`
+        SELECT s.student_id, u.name, s.placement_score, s.cgpa
+        FROM faculty_student_assignments fsa
+        JOIN students s ON s.student_id = fsa.student_id
+        JOIN users u ON u.user_id = fsa.student_id
+        WHERE fsa.faculty_id = $1
+      `, [facultyId]);
+
+      const students = studentsResult.rows;
+      const total = students.length;
+
+      if (total === 0) {
+        return res.json({ success: true, message: 'No students assigned yet.', analytics: null });
+      }
+
+      // Score distribution buckets
+      const buckets = { '0-40': 0, '41-70': 0, '71-90': 0, '91-100': 0 };
+      let totalScore = 0;
+      students.forEach(s => {
+        const sc = s.placement_score || 0;
+        totalScore += sc;
+        if (sc <= 40) buckets['0-40']++;
+        else if (sc <= 70) buckets['41-70']++;
+        else if (sc <= 90) buckets['71-90']++;
+        else buckets['91-100']++;
+      });
+      const avgScore = Math.round(totalScore / total);
+
+      // Top 3 and Bottom 3 by placement score
+      const sorted = [...students].sort((a, b) => b.placement_score - a.placement_score);
+      const top3 = sorted.slice(0, 3);
+      const bottom3 = sorted.slice(-3).reverse();
+
+      // Task completion rate
+      const taskResult = await db.query(`
+        SELECT
+          COUNT(*) AS total_assigned,
+          COUNT(*) FILTER (WHERE status IN ('SUBMITTED', 'EVALUATED')) AS completed
+        FROM task_assignments ta
+        WHERE ta.student_id = ANY(
+          SELECT student_id FROM faculty_student_assignments WHERE faculty_id = $1
+        )
+      `, [facultyId]);
+
+      const taskStats = taskResult.rows[0];
+      const completionRate = taskStats.total_assigned > 0
+        ? Math.round((taskStats.completed / taskStats.total_assigned) * 100)
+        : 0;
+
+      res.json({
+        success: true,
+        analytics: {
+          totalStudents: total,
+          averagePlacementScore: avgScore,
+          scoreDistribution: buckets,
+          top3Performers: top3,
+          bottom3Performers: bottom3,
+          taskCompletionRate: completionRate,
+          taskStats
         }
-      ];
-
-      return res.status(200).json({
-        success: true,
-        pending: pending.length > 0 ? pending : fallback
       });
-    } catch (error) {
-      return next(error);
+    } catch (err) {
+      console.error('getBatchAnalytics error:', err);
+      res.status(500).json({ error: 'Failed to generate batch analytics' });
     }
   },
 
   /*
-  POST /api/faculty/questions/import
-  Processes bulk copy-paste questions or CSV strings uploaded by faculty.
+  Import bulk questions from CSV or JSON format (Faculty only).
+  Used by ManageQuestions.jsx page.
+  Body: { csvText, listType } where listType is 'csv' or 'json'
   */
-  importQuestions: async (req, res, next) => {
+  importQuestions: async (req, res) => {
     try {
       const { csvText, listType } = req.body;
-      if (!csvText) {
-        return res.status(400).json({ success: false, message: 'No questions content supplied.' });
+      const createdBy = req.user.user_id;
+
+      if (!csvText || !csvText.trim()) {
+        return res.status(400).json({ success: false, message: 'No question data provided.' });
       }
 
-      let questionsToInsert = [];
+      let questions = [];
 
       if (listType === 'json') {
-        const parsed = JSON.parse(csvText);
-        questionsToInsert = parsed.map(q => ({
-          category: q.category || 'GENERAL',
-          question_text: q.question_text || q.text,
-          options: q.options || null,
-          correct_answer: q.correct_answer || q.answer || null,
-          created_by: req.user.user_id
-        }));
+        // Parse JSON format
+        try {
+          questions = JSON.parse(csvText);
+          if (!Array.isArray(questions)) questions = [questions];
+        } catch {
+          return res.status(400).json({ success: false, message: 'Invalid JSON format.' });
+        }
       } else {
-        // Parse CSV format text
-        const lines = csvText.split('\n');
-        lines.forEach(line => {
-          if (!line.trim()) return;
+        // Parse CSV format: CATEGORY,Question Text,Option1;Option2;Option3;Option4,CorrectOption
+        const lines = csvText.split('\n').filter(l => l.trim());
+        for (const line of lines) {
           const parts = line.split(',');
-          if (parts.length >= 2) {
-            const category = parts[0].trim().toUpperCase();
-            const question_text = parts[1].trim();
-            const optionsRaw = parts[2] ? parts[2].trim() : '';
-            const options = optionsRaw ? optionsRaw.split(';').map(o => o.trim()) : null;
-            const correct_answer = parts[3] ? parts[3].trim() : null;
-            
-            questionsToInsert.push({
-              category,
-              question_text,
-              options,
-              correct_answer,
-              created_by: req.user.user_id
-            });
-          }
-        });
+          if (parts.length < 2) continue;
+          const category = parts[0].trim().toUpperCase();
+          const question_text = parts[1].trim();
+          const optionStr = parts[2]?.trim() || '';
+          const correct_answer = parts[3]?.trim() || null;
+          const options = optionStr ? optionStr.split(';').map(o => o.trim()) : null;
+          questions.push({ category, question_text, options, correct_answer });
+        }
       }
 
-      if (questionsToInsert.length === 0) {
-        return res.status(400).json({ success: false, message: 'Could not parse any valid questions.' });
+      if (questions.length === 0) {
+        return res.status(400).json({ success: false, message: 'No valid questions found in the data.' });
       }
 
-      const insertedCount = await Question.bulkInsert(questionsToInsert);
-      return res.status(201).json({
-        success: true,
-        message: `Successfully imported ${insertedCount} questions.`,
-        count: insertedCount
-      });
-    } catch (error) {
-      return next(error);
-    }
-  },
+      let imported = 0;
+      let skipped = 0;
 
-  /*
-  POST /api/faculty/answers/evaluate
-  Evaluates and scores a student written subjective answer.
-  */
-  evaluateStudentAnswer: async (req, res, next) => {
-    try {
-      const { answerId, score, feedback } = req.body;
-      const updatedAnswer = await Answer.gradeAnswer(answerId, score, feedback);
-      return res.status(200).json({
+      for (const q of questions) {
+        if (!q.question_text || !q.category) { skipped++; continue; }
+        try {
+          await db.query(`
+            INSERT INTO questions (category, question_text, options, correct_answer, created_by)
+            VALUES ($1, $2, $3, $4, $5)
+          `, [
+            q.category?.toUpperCase(),
+            q.question_text,
+            q.options ? JSON.stringify(q.options) : null,
+            q.correct_answer || null,
+            createdBy
+          ]);
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+
+      res.json({
         success: true,
-        message: 'Student answer evaluated successfully',
-        answer: updatedAnswer
+        message: `Import complete. ${imported} question(s) added, ${skipped} skipped (duplicates or invalid).`,
+        imported,
+        skipped
       });
-    } catch (error) {
-      return next(error);
+    } catch (err) {
+      console.error('importQuestions error:', err);
+      res.status(500).json({ success: false, message: 'Failed to import questions.' });
     }
   }
 };
+

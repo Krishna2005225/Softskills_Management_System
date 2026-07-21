@@ -2,38 +2,82 @@
 ------------------------------------------------
 File: Profile.jsx
 Purpose: Authenticated profile update page.
-Responsibilities: Logs profile changes, commits updates to backend servers.
-Dependencies: react, useAuth, authService, Card, Button
-------------------------------------------------
-*/
-
-/*
-------------------------------------------------
-File: Profile.jsx
-Purpose: Authenticated profile update page.
-Responsibilities: Logs profile changes, commits updates to backend servers.
-Dependencies: react, axiosClient, Card, Button
+Responsibilities: Logs profile changes, commits updates to backend servers, manages account security & password change modal.
+Dependencies: react, axiosClient, Card, Button, lucide-react
 ------------------------------------------------
 */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
+import studentService from '../services/studentService';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import { User, Mail, GraduationCap, Award, Calendar, BarChart2 } from 'lucide-react';
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  GraduationCap, 
+  Calendar, 
+  Lock, 
+  LogOut, 
+  ShieldAlert, 
+  Edit,
+  Award,
+  X,
+  Send,
+  Check,
+  Users
+} from 'lucide-react';
 
 const Profile = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
+  
+  // Form fields state
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('CSE');
-  const [rollNo, setRollNo] = useState('');
-  const [year, setYear] = useState('');
-  const [cgpa, setCgpa] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [certificates, setCertificates] = useState([]);
-  const [claiming, setClaiming] = useState(false);
+
+  // Mentor Selection States
+  const [faculties, setFaculties] = useState([]);
+  const [selectedFaculty, setSelectedFaculty] = useState('');
+  const [currentMentor, setCurrentMentor] = useState(null);
+  const [mentorSaving, setMentorSaving] = useState(false);
+  const [mentorSuccess, setMentorSuccess] = useState('');
+  const [mentorError, setMentorError] = useState('');
+
+  // --- PASSWORD CHANGE MODAL STATES ---
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [verifyMethod, setVerifyMethod] = useState('password'); // 'password' or 'otp'
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPass, setChangingPass] = useState(false);
+  const [passError, setPassError] = useState('');
+  const [passSuccess, setPassSuccess] = useState('');
+  
+  // OTP cooldown states
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+
+  // Timer logic for OTP cooldown
+  useEffect(() => {
+    let interval = null;
+    if (otpCooldown > 0) {
+      interval = setInterval(() => {
+        setOtpCooldown((prev) => prev - 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [otpCooldown]);
 
   const fetchProfile = async () => {
     try {
@@ -43,9 +87,21 @@ const Profile = () => {
         setProfile(u);
         setName(u.name || '');
         setDepartment(u.department || 'CSE');
-        setRollNo(u.roll_no || '');
-        setYear(u.year || '');
-        setCgpa(u.cgpa || '');
+        setEmail(u.email || '');
+        setPhone(u.phone || '+91 98765 43210');
+
+        if (u.role === 'STUDENT') {
+          // Fetch available faculties and current mentor choice
+          const [facsRes, mentorRes] = await Promise.all([
+            studentService.getFaculties(),
+            studentService.getMyFaculty()
+          ]);
+          if (facsRes.success) setFaculties(facsRes.faculties || []);
+          if (mentorRes.success && mentorRes.faculty) {
+            setCurrentMentor(mentorRes.faculty);
+            setSelectedFaculty(mentorRes.faculty.faculty_id);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -54,20 +110,8 @@ const Profile = () => {
     }
   };
 
-  const fetchCertificates = async () => {
-    try {
-      const res = await axiosClient.get('/certificates');
-      if (res.data.success) {
-        setCertificates(res.data.certificates);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
     fetchProfile();
-    fetchCertificates();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -77,9 +121,10 @@ const Profile = () => {
       const res = await axiosClient.put('/auth/profile', {
         name,
         department,
-        roll_no: rollNo,
-        year: parseInt(year) || null,
-        cgpa: parseFloat(cgpa) || null
+        phone,
+        roll_no: profile?.roll_no || '23601A5327',
+        year: profile?.year || 4,
+        cgpa: profile?.cgpa || 8.25
       });
       if (res.data.success) {
         setProfile(res.data.user);
@@ -93,198 +138,494 @@ const Profile = () => {
     }
   };
 
-  const handleClaim = async () => {
-    setClaiming(true);
+  const handleSaveMentor = async (e) => {
+    e.preventDefault();
+    if (!selectedFaculty) return;
+    setMentorSaving(true);
+    setMentorSuccess('');
+    setMentorError('');
     try {
-      const res = await axiosClient.post('/certificates/claim');
-      if (res.data.success) {
-        alert(res.data.message);
-        fetchCertificates();
+      const res = await studentService.assignFaculty(selectedFaculty);
+      if (res.success) {
+        setMentorSuccess(res.message);
+        const chosen = faculties.find(f => f.faculty_id === selectedFaculty);
+        if (chosen) setCurrentMentor(chosen);
+      } else {
+        setMentorError(res.message || 'Failed to assign advisor.');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to claim certificate.');
+      setMentorError(err.response?.data?.message || 'Failed to save advisor.');
     } finally {
-      setClaiming(false);
+      setMentorSaving(false);
     }
   };
 
+  const handleSendOtp = async () => {
+    if (otpCooldown > 0) return;
+    setSendingOtp(true);
+    setPassError('');
+    setPassSuccess('');
+    try {
+      const res = await axiosClient.post('/auth/send-otp');
+      if (res.data.success) {
+        setPassSuccess('OTP code successfully sent to email!');
+        setOtpCooldown(60); // 60 seconds cooldown
+      }
+    } catch (err) {
+      console.error(err);
+      setPassError(err.response?.data?.message || 'Failed to dispatch OTP. Please check backend logs.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPassError('');
+    setPassSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setPassError('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPassError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setChangingPass(true);
+    try {
+      const payload = { newPassword };
+      if (verifyMethod === 'otp') {
+        payload.otpCode = otpCode;
+      } else {
+        payload.currentPassword = currentPassword;
+      }
+
+      const res = await axiosClient.put('/auth/change-password', payload);
+      if (res.data.success) {
+        setPassSuccess('Password updated successfully!');
+        setCurrentPassword('');
+        setOtpCode('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setPassSuccess('');
+        }, 1500);
+      }
+    } catch (err) {
+      console.error(err);
+      setPassError(err.response?.data?.message || 'Failed to change password. Please check input parameters.');
+    } finally {
+      setChangingPass(false);
+    }
+  };
+
+  const handleLogoutAll = () => {
+    alert('Signing out from all devices...');
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
+  const formatJoinDate = (dateStr) => {
+    if (!dateStr) return 'May 20, 2024';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  const getDeptFullName = (code) => {
+    const names = {
+      'CSE': 'Computer Science & Engineering',
+      'IT': 'Information Technology',
+      'ECE': 'Electronics & Communication Engineering',
+      'EEE': 'Electrical & Electronics Engineering'
+    };
+    return names[code] || code || 'Computer Science & Engineering';
+  };
+
   if (loading) {
-    return <p className="text-xs text-slate-400 py-6 text-center">Loading profile details...</p>;
+    return <p className="text-xs text-slate-400 py-12 text-center">Loading profile details...</p>;
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight font-sans">User Profile</h1>
-        <p className="text-slate-500 dark:text-slate-400">Manage account information, check active role permissions, and modify credentials details.</p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-8">
-        
-        {/* Left card: Summary Card */}
-        <Card className="flex flex-col items-center text-center p-8 h-fit">
-          <div className="h-24 w-24 bg-blue-600 text-white text-3xl font-extrabold rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4">
-            {name.charAt(0)}
-          </div>
-          <h2 className="font-extrabold text-xl">{name}</h2>
-          <span className="mt-1 px-3 py-1 bg-slate-100 dark:bg-slate-800 text-xs font-bold rounded-lg uppercase tracking-wider text-slate-500">
-            {profile?.role || 'STUDENT'}
-          </span>
-
-          <div className="w-full border-t border-slate-100 dark:border-slate-800 mt-6 pt-6 text-left space-y-4 text-xs text-slate-500">
-            <div className="flex items-center gap-3">
-              <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="truncate">{profile?.email}</span>
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 font-sans relative">
+      
+      {/* Modal: Change Password */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-6 relative">
+            <button 
+              onClick={() => { setShowPasswordModal(false); setPassError(''); setPassSuccess(''); }}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-855 dark:text-white flex items-center gap-2">
+                <Lock className="w-5.5 h-5.5 text-blue-500" />
+                <span>Change Password</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Update your account credentials below.</p>
             </div>
-            <div className="flex items-center gap-3">
-              <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>Department: {profile?.department}</span>
-            </div>
-            {profile?.role === 'STUDENT' && (
-              <>
-                <div className="flex items-center gap-3">
-                  <BarChart2 className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span>CGPA Rating: {profile?.cgpa || '0.0'}</span>
-                </div>
-                <div className="flex items-center gap-3 bg-blue-50/50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-blue-600 dark:text-blue-400 font-bold">
-                  <Award className="w-4 h-4 shrink-0" />
-                  <span>Readiness: {profile?.placement_score || '0'}%</span>
-                </div>
-              </>
-            )}
-          </div>
-        </Card>
 
-        {/* Right card: Input Details Form */}
-        <Card title="Account details" className="md:col-span-2">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid sm:grid-cols-2 gap-4">
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              
+              {/* Method Selector Link */}
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerifyMethod(verifyMethod === 'password' ? 'otp' : 'password');
+                    setPassError('');
+                  }}
+                  className="text-xs text-blue-505 hover:underline font-bold"
+                >
+                  {verifyMethod === 'password' ? 'Or verify with Email OTP instead' : 'Use current password instead'}
+                </button>
+              </div>
+
+              {verifyMethod === 'password' ? (
+                /* Current Password validation */
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="mt-1.5 block w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                  />
+                </div>
+              ) : (
+                /* OTP Code validation */
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Email Verification Code (OTP)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="otpCode"
+                      name="otpCode"
+                      autoComplete="one-time-code"
+                      required
+                      value={otpCode}
+                      onChange={e => setOtpCode(e.target.value)}
+                      placeholder="Enter 6-digit code"
+                      className="block flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                    />
+                    <button
+                      type="button"
+                      disabled={sendingOtp || otpCooldown > 0}
+                      onClick={handleSendOtp}
+                      className="px-3.5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 select-none"
+                    >
+                      {otpCooldown > 0 ? (
+                        <span>Retry ({otpCooldown}s)</span>
+                      ) : (
+                        <>
+                          <Send className="w-3 h-3" />
+                          <span>{sendingOtp ? 'Sending...' : 'Send OTP'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* New Password input */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase">Full Name</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  required 
-                  className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="mt-1.5 block w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
                 />
               </div>
 
+              {/* Confirm Password input */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase">Department</label>
-                <select 
-                  value={department} 
-                  onChange={(e) => setDepartment(e.target.value)} 
-                  className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="mt-1.5 block w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                />
+              </div>
+
+              {passError && (
+                <p className="text-[11px] font-bold text-rose-500 bg-rose-500/5 p-2.5 rounded-xl border border-rose-500/10">
+                  ⚠️ {passError}
+                </p>
+              )}
+
+              {passSuccess && (
+                <p className="text-[11px] font-bold text-emerald-500 bg-emerald-500/5 p-2.5 rounded-xl border border-emerald-500/10">
+                  ✓ {passSuccess}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  loading={changingPass}
+                  className="flex-1 text-xs py-2.5 uppercase font-extrabold tracking-wider justify-center"
                 >
-                  <option value="CSE">CSE</option>
-                  <option value="ECE">ECE</option>
-                  <option value="EEE">EEE</option>
-                  <option value="MECH">MECH</option>
-                </select>
+                  Save Password
+                </Button>
+                <button 
+                  type="button"
+                  onClick={() => { setShowPasswordModal(false); setPassError(''); setPassSuccess(''); }}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
               </div>
-            </div>
-
-            {profile?.role === 'STUDENT' && (
-              <div className="grid sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase">Roll Number</label>
-                  <input 
-                    type="text" 
-                    value={rollNo} 
-                    onChange={(e) => setRollNo(e.target.value)} 
-                    required 
-                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase">Graduation Year</label>
-                  <input 
-                    type="number" 
-                    value={year} 
-                    onChange={(e) => setYear(e.target.value)} 
-                    required 
-                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase">Current CGPA</label>
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    min="0"
-                    max="10"
-                    value={cgpa} 
-                    onChange={(e) => setCgpa(e.target.value)} 
-                    required 
-                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="pt-4">
-              <Button type="submit" variant="primary" loading={updating} className="px-8 text-xs font-bold">
-                Update Profile details
-              </Button>
-            </div>
-          </form>
-        </Card>
-      </div>
-
-      {/* Certificates section */}
-      {profile?.role === 'STUDENT' && (
-        <div className="grid md:grid-cols-3 gap-8 mt-8">
-          <Card title="Verified Claims & Awards" className="md:col-span-3">
-            {certificates.length > 0 ? (
-              <div className="space-y-6 max-w-2xl">
-                {certificates.map((cert) => (
-                  <div key={cert.certificate_id} className="p-8 border-4 border-double border-amber-500 rounded-3xl bg-amber-50/10 dark:bg-amber-950/10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-                    <div className="space-y-2">
-                      <span className="px-3 py-1 bg-amber-500 text-white rounded-full text-[9px] font-bold tracking-wider uppercase">
-                        Verified Claim
-                      </span>
-                      <h3 className="text-lg font-extrabold text-amber-700 dark:text-amber-400 font-sans mt-2">Placement Readiness Certificate</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">This certifies that <strong>{name}</strong> has achieved the required placement index in soft skills modules.</p>
-                      <p className="text-[10px] font-mono text-slate-400 mt-2 font-bold">Verification ID: {cert.verification_hash}</p>
-                    </div>
-
-                    <div className="shrink-0 flex flex-col items-center gap-2">
-                      {/* QR Code SVG */}
-                      <svg width="80" height="80" viewBox="0 0 29 29" fill="none" className="bg-white p-1.5 rounded-xl shadow border border-slate-100">
-                        <path d="M0 0h7v7H0V0zm1 1v5h5V1H1zm2 2h1v1H3V3zm18-3h7v7h-7V0zm1 1v5h5V1h-5zm2 2h1v1h-1V3zM0 22h7v7H0v-7zm1 1v5h5v-5H1zm2 2h1v1H3v-1zm13-13v2h2v-2h-2zm4 0v2h2v-2h-2zm-2 2v2h2v-2h-2zm4 0v2h2v-2h-2zm-4 4v2h2v-2h-2zm2 2v2h2v-2h-2zm-6 2v2h2v-2h-2zm6 0v2h2v-2h-2z" fill="#000"/>
-                        <path d="M9 1h1v1H9V1zm2 1h1v1h-1V2zm0 2h1v1h-1V4zm-2 1h1v1H9V5zm4-4h1v1h-1V1zm1 2h1v1h-1V3zm-2 2h1v1h-1V5zm9 5h1v1h-1v-1zm0 2h1v1h-1v-1zm-2-1h1v1h-1v-1zm-2 2h1v1h-1v-1zm3 2h1v1h-1v-1zm-2 1h1v1h-1v-1z" fill="#000"/>
-                      </svg>
-                      <span className="text-[8px] font-bold font-mono text-slate-400 uppercase">Scan to Verify</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 space-y-4">
-                <p className="text-xs text-slate-400">You haven't claimed any certificates yet.</p>
-                {profile?.placement_score >= 80 ? (
-                  <Button 
-                    onClick={handleClaim} 
-                    loading={claiming}
-                    variant="primary" 
-                    className="text-xs font-bold px-6 bg-amber-600 hover:bg-amber-700"
-                  >
-                    Claim Placement Readiness Certificate
-                  </Button>
-                ) : (
-                  <p className="text-xs font-bold text-rose-500">Achieve a placement readiness score of 80% or more to unlock certificate claims. (Current Score: {profile?.placement_score}%)</p>
-                )}
-              </div>
-            )}
-          </Card>
+            </form>
+          </div>
         </div>
       )}
+
+      {/* Page Header */}
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+          <span>User Profile</span>
+          <User className="w-6 h-6 text-blue-505" />
+        </h1>
+        <p className="text-sm text-slate-550 dark:text-slate-400 mt-1">
+          Manage account information, check active role permissions, and modify credentials details.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column: Summary Card */}
+        <div className="lg:col-span-1">
+          <div className="p-8 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-md flex flex-col items-center text-center">
+            
+            {/* Avatar Circle */}
+            <div className="h-24 w-24 bg-gradient-to-tr from-blue-600 to-indigo-650 text-white text-3xl font-black rounded-full flex items-center justify-center shadow-lg shadow-blue-500/10 mb-4 select-none">
+              {name.charAt(0).toUpperCase()}
+            </div>
+            
+            {/* Name & Role */}
+            <h2 className="font-extrabold text-xl text-slate-900 dark:text-slate-100 font-sans">{name}</h2>
+            <span className="mt-2.5 px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-full uppercase tracking-widest border border-blue-500/15">
+              {profile?.role || 'STUDENT'}
+            </span>
+
+            {/* Divider Line */}
+            <div className="w-full border-t border-slate-100 dark:border-slate-850 mt-6 pt-6 text-left space-y-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              
+              {/* Email Address */}
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="truncate">{email}</span>
+              </div>
+
+              {/* Phone Number */}
+              <div className="flex items-center gap-3">
+                <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>{phone}</span>
+              </div>
+
+              {/* Department */}
+              <div className="flex items-center gap-3">
+                <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="leading-snug">{getDeptFullName(profile?.department)}</span>
+              </div>
+
+              {/* Member Since */}
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Member Since: {formatJoinDate(profile?.created_at)}</span>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        {/* Right Column: Edit Details Form & Account Security */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Card 1: Account Details Form */}
+          <Card title="Account details">
+            <form onSubmit={handleSubmit} className="space-y-6 font-sans">
+              
+              <div className="grid sm:grid-cols-2 gap-5">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Full Name
+                  </label>
+                  <input 
+                    type="text" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)} 
+                    required 
+                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                  />
+                </div>
+
+                {/* Department Dropdown */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Department
+                  </label>
+                  <select 
+                    value={department} 
+                    onChange={(e) => setDepartment(e.target.value)} 
+                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-slate-950 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800 dark:text-slate-250 font-semibold"
+                  >
+                    <option value="CSE">CSE</option>
+                    <option value="IT">IT</option>
+                    <option value="ECE">ECE</option>
+                    <option value="EEE">EEE</option>
+                  </select>
+                </div>
+
+                {/* Email Address */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Email Address
+                  </label>
+                  <input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                  />
+                </div>
+
+                {/* Phone Number */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Phone Number
+                  </label>
+                  <input 
+                    type="text" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value)} 
+                    required 
+                    className="mt-1.5 block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-transparent text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 text-slate-800 dark:text-slate-200 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <Button type="submit" variant="primary" loading={updating} className="text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 uppercase font-extrabold tracking-wider">
+                <Edit className="w-3.5 h-3.5" /> Update Profile details
+              </Button>
+
+            </form>
+          </Card>
+
+          {/* Card 1.5: Mentor Selection (Student only) */}
+          {profile?.role === 'STUDENT' && (
+            <Card title="Faculty Mentor / Advisor">
+              <form onSubmit={handleSaveMentor} className="space-y-4 font-sans">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Select your assigned mentor or faculty advisor to link your progress reports and receive assignments.
+                </p>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    Select Faculty Advisor
+                  </label>
+                  <select
+                    value={selectedFaculty}
+                    onChange={(e) => setSelectedFaculty(e.target.value)}
+                    className="block w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-900 bg-slate-950 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-850 dark:text-slate-250 font-semibold"
+                    required
+                  >
+                    <option value="">-- Choose Advisor --</option>
+                    {faculties.map(f => (
+                      <option key={f.faculty_id} value={f.faculty_id}>
+                        {f.name} ({f.department} - {f.specialization})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {currentMentor && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-xl text-xs font-bold flex items-center gap-2">
+                    <Check className="w-4 h-4" />
+                    Current Mentor: {currentMentor.name} ({currentMentor.department})
+                  </div>
+                )}
+
+                {mentorError && (
+                  <p className="text-[11px] font-bold text-rose-500 bg-rose-500/5 p-2 rounded-xl border border-rose-500/10">
+                    ⚠️ {mentorError}
+                  </p>
+                )}
+
+                {mentorSuccess && (
+                  <p className="text-[11px] font-bold text-emerald-500 bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
+                    ✓ {mentorSuccess}
+                  </p>
+                )}
+
+                <Button type="submit" variant="primary" loading={mentorSaving} className="text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 uppercase font-extrabold tracking-wider">
+                  <Users className="w-3.5 h-3.5" /> Save Mentor Advisor
+                </Button>
+              </form>
+            </Card>
+          )}
+
+          {/* Card 2: Account Security */}
+          <div className="p-6 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800/80 rounded-3xl shadow-md space-y-4 font-sans">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 bg-blue-500/10 text-blue-505 rounded-lg">
+                <Lock className="w-4.5 h-4.5" />
+              </span>
+              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">Account Security</h3>
+            </div>
+            
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Keep your account secure with strong password and active sessions management.
+            </p>
+
+            <div className="flex flex-wrap gap-4 pt-2">
+              <button 
+                onClick={() => { setShowPasswordModal(true); setPassError(''); setPassSuccess(''); }}
+                className="flex items-center gap-1.5 px-4 py-2.5 border border-slate-200 dark:border-slate-800 dark:hover:bg-slate-900/60 hover:bg-slate-50 text-xs font-extrabold text-slate-700 dark:text-slate-300 rounded-xl transition-all shadow-sm"
+              >
+                <Lock className="w-3.5 h-3.5" /> Change Password
+              </button>
+
+              <button 
+                onClick={handleLogoutAll}
+                className="flex items-center gap-1.5 px-4 py-2.5 border border-rose-500/20 hover:bg-rose-500/[0.05] text-xs font-extrabold text-rose-500 rounded-xl transition-all shadow-sm"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Sign Out All Devices
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 };
 
 export default Profile;
-

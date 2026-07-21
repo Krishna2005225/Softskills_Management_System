@@ -7,22 +7,41 @@ Dependencies: react, react-router-dom, useAuth, ThemeContext, lucide-react
 ------------------------------------------------
 */
 
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ThemeContext } from '../contexts/ThemeContext';
+import axiosClient from '../api/axiosClient';
 import { 
   LayoutDashboard, User, Settings, LogOut, Bell, Sun, Moon, 
   Menu, X, BookOpen, GraduationCap, Users, FileText, CheckSquare, Award, BarChart3,
-  Lightbulb, Crown
+  Lightbulb, Crown, ClipboardList
 } from 'lucide-react';
 
 const DashboardLayout = () => {
   const { user, logout } = useAuth();
   const { darkMode, toggleTheme } = useContext(ThemeContext);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await axiosClient.get('/notifications/count');
+        if (res.data.success) setUnreadCount(res.data.count);
+      } catch {
+        // Silently ignore — user may not be logged in yet
+      }
+    };
+    if (user) {
+      fetchCount();
+      const interval = setInterval(fetchCount, 60000); // refresh every 60s
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -39,10 +58,11 @@ const DashboardLayout = () => {
     if (user?.role === 'STUDENT') {
       return [
         { name: 'Dashboard', path: '/student/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+        { name: 'My Tasks', path: '/student/tasks', icon: <ClipboardList className="w-5 h-5" /> },
         { name: 'Communication', path: '/communication', icon: <BookOpen className="w-5 h-5" /> },
         { name: 'Mock Interview', path: '/mock-interview', icon: <GraduationCap className="w-5 h-5" /> },
         { name: 'Group Discussion', path: '/group-discussion', icon: <Users className="w-5 h-5" /> },
-        { name: 'Resume Builder', path: '/resume-builder', icon: <FileText className="w-5 h-5" /> },
+        { name: 'Resume Analyzer', path: '/resume-builder', icon: <FileText className="w-5 h-5" /> },
         { name: 'Aptitude Tests', path: '/aptitude', icon: <CheckSquare className="w-5 h-5" /> },
         { name: 'Coding Arena', path: '/coding', icon: <FileText className="w-5 h-5" /> },
         { name: 'AI Advisor', path: '/advisor', icon: <GraduationCap className="w-5 h-5" /> },
@@ -56,9 +76,9 @@ const DashboardLayout = () => {
     if (user?.role === 'FACULTY') {
       return [
         { name: 'Faculty Dashboard', path: '/faculty/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-        { name: 'Assign Activity', path: '/faculty/activities', icon: <BookOpen className="w-5 h-5" /> },
+        { name: 'Task Manager', path: '/faculty/tasks', icon: <ClipboardList className="w-5 h-5" /> },
+        { name: 'My Students', path: '/faculty/dashboard', icon: <Users className="w-5 h-5" /> },
         { name: 'Manage Questions', path: '/faculty/questions', icon: <CheckSquare className="w-5 h-5" /> },
-        { name: 'Evaluate Students', path: '/faculty/evaluations', icon: <GraduationCap className="w-5 h-5" /> },
         { name: 'GD Scheduler', path: '/group-discussion', icon: <Users className="w-5 h-5" /> },
         { name: 'Class Reports', path: '/reports', icon: <BarChart3 className="w-5 h-5" /> },
         ...common
@@ -113,7 +133,7 @@ const DashboardLayout = () => {
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                   isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' 
+                    ? 'accent-bg-primary text-white accent-shadow-primary' 
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-gray-100'
                 }`}
               >
@@ -196,10 +216,15 @@ const DashboardLayout = () => {
             {/* Notifications */}
             <Link 
               to="/notifications" 
+              onClick={() => setUnreadCount(0)}
               className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors relative"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-white font-bold" style={{ fontSize: 9 }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </Link>
 
             <div className="h-8 w-px bg-slate-200 dark:bg-slate-800" />

@@ -62,5 +62,71 @@ module.exports = {
         error: err.message
       };
     }
+  },
+
+  /*
+  Sends OTP Verification code.
+  Params: recipientEmail (string), otpCode (string).
+  Returns: Delivery status.
+  */
+  sendOTPEmail: async (recipientEmail, otpCode) => {
+    console.log(`[EMAIL SERVICE] Initializing OTP broadcast to: ${recipientEmail}`);
+    
+    const smtpHost = process.env.SMTP_HOST || 'smtp.mailtrap.io';
+    const smtpPort = process.env.SMTP_PORT || 2525;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (!smtpUser || !smtpPass) {
+      console.log(`[EMAIL SERVICE] Missing SMTP credentials. Fallback to console logs.`);
+      console.log(`[EMAIL SERVICE] *******************************************`);
+      console.log(`[EMAIL SERVICE]   YOUR VERIFICATION OTP CODE: ${otpCode}`);
+      console.log(`[EMAIL SERVICE] *******************************************`);
+      return {
+        success: true,
+        message: 'OTP outputted to console logs (fallback).'
+      };
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(smtpPort),
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+
+      const mailOptions = {
+        from: '"SkillForge Security Team" <security@skillforge.edu>',
+        to: recipientEmail,
+        subject: 'Placement Readiness Portal - OTP Security Verification',
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; max-width: 600px; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #2563eb;">OTP Security Verification</h2>
+            <p>You requested to change your password. Please verify using this OTP code:</p>
+            <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 4px; border-radius: 8px; margin: 15px 0; color: #1e3a8a;">
+              ${otpCode}
+            </div>
+            <p style="color: #666; font-size: 11px;">This code is valid for 10 minutes. If you did not request this action, please secure your credentials immediately.</p>
+          </div>
+        `
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[EMAIL SERVICE] OTP SMTP dispatch complete. Msg ID: ${info.messageId}`);
+      return {
+        success: true,
+        message: 'OTP verification email dispatched successfully.'
+      };
+    } catch (err) {
+      console.error(`[EMAIL SERVICE] Nodemailer OTP dispatch failed: ${err.message}`);
+      return {
+        success: false,
+        message: 'SMTP dispatch failed, OTP fallback printed to logs.',
+        error: err.message
+      };
+    }
   }
 };

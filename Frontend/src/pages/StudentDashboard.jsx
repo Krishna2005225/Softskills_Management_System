@@ -73,20 +73,28 @@ const StudentDashboard = () => {
     };
   };
 
+  const scores = stats?.weeklyScores || [0, 0, 0, 0, 0];
+  const getY = (val) => 180 - ((val || 0) * 1.6);
+  const y0 = getY(scores[0]);
+  const y1 = getY(scores[1]);
+  const y2 = getY(scores[2]);
+  const y3 = getY(scores[3]);
+  const y4 = getY(scores[4]);
+
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Welcome, {stats?.profile?.name || 'Krishna'}! 👋
+            Welcome, {stats?.profile?.name || 'Student'}! 👋
           </h1>
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">
             Here is your placement readiness check for this week.
           </p>
         </div>
         <div className="text-xs font-black tracking-wider px-4 py-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl shadow-sm">
-          Roll No: {stats?.profile?.roll_no || '23601A5327'}
+          Roll No: {stats?.profile?.roll_no || 'N/A'}
         </div>
       </div>
 
@@ -101,7 +109,7 @@ const StudentDashboard = () => {
               </div>
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Placement Score</p>
-                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.placementScore || 81}%</p>
+                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.placementScore || 0}%</p>
               </div>
             </div>
           </div>
@@ -112,7 +120,7 @@ const StudentDashboard = () => {
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
-                style={{ width: `${stats?.placementScore || 81}%` }} 
+                style={{ width: `${stats?.placementScore || 0}%` }} 
                 className="bg-blue-600 h-full rounded-full transition-all duration-500" 
               />
             </div>
@@ -128,17 +136,17 @@ const StudentDashboard = () => {
               </div>
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Attendance Rate</p>
-                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.attendance || 100}%</p>
+                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.attendance || 0}%</p>
               </div>
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-500 mb-2">
-              <span>☘ Perfect! Keep it up.</span>
+            <div className={`flex items-center gap-1 text-xs font-bold mb-2 ${stats?.attendance > 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
+              <span>{stats?.attendance > 0 ? '☘ Perfect! Keep it up.' : 'No attendance logs recorded.'}</span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
-                style={{ width: `${stats?.attendance || 100}%` }} 
+                style={{ width: `${stats?.attendance || 0}%` }} 
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
               />
             </div>
@@ -154,7 +162,7 @@ const StudentDashboard = () => {
               </div>
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Aptitude Score</p>
-                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.aptitudeScore || 85}/100</p>
+                <p className="text-3xl font-black text-slate-900 dark:text-white">{stats?.aptitudeScore || 0}/100</p>
               </div>
             </div>
           </div>
@@ -165,7 +173,7 @@ const StudentDashboard = () => {
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div 
-                style={{ width: `${stats?.aptitudeScore || 85}%` }} 
+                style={{ width: `${stats?.aptitudeScore || 0}%` }} 
                 className="bg-purple-500 h-full rounded-full transition-all duration-500" 
               />
             </div>
@@ -214,9 +222,8 @@ const StudentDashboard = () => {
               <text x="10" y="184" className="text-[10px] font-bold text-slate-400 fill-current">0%</text>
 
               {/* Smooth line path */}
-              {/* Coordinates mappings: Week 1(50%)=100, Week 2(60%)=84, Week 3(65%)=76, Week 4(66%)=74.4, Week 5(80%)=52 */}
               <path
-                d="M 50 100 L 150 84 L 250 76 L 350 74 L 450 52"
+                d={`M 50 ${y0} L 150 ${y1} L 250 ${y2} L 350 ${y3} L 450 ${y4}`}
                 fill="none"
                 stroke="url(#strokeGrad)"
                 strokeWidth="4"
@@ -226,16 +233,16 @@ const StudentDashboard = () => {
 
               {/* Area Fill beneath the line */}
               <path
-                d="M 50 100 L 150 84 L 250 76 L 350 74 L 450 52 L 450 180 L 50 180 Z"
+                d={`M 50 ${y0} L 150 ${y1} L 250 ${y2} L 350 ${y3} L 450 ${y4} L 450 180 L 50 180 Z`}
                 fill="url(#lineGrad)"
               />
 
               {/* Points */}
-              <circle cx="50" cy="100" r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
-              <circle cx="150" cy="84" r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
-              <circle cx="250" cy="76" r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
-              <circle cx="350" cy="74" r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
-              <circle cx="450" cy="52" r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
+              <circle cx="50" cy={y0} r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
+              <circle cx="150" cy={y1} r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
+              <circle cx="250" cy={y2} r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
+              <circle cx="350" cy={y3} r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
+              <circle cx="450" cy={y4} r="6" className="fill-blue-600 dark:fill-blue-500 stroke-white dark:stroke-[#111625]" strokeWidth="3" />
             </svg>
           </div>
           
@@ -263,10 +270,10 @@ const StudentDashboard = () => {
           <div className="grid grid-cols-4 gap-4 h-64 pt-6 items-end">
             {/* Aptitude Bar */}
             <div className="flex flex-col items-center gap-2 group h-full justify-end">
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.Aptitude || 82}%</span>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.Aptitude || 0}%</span>
               <div className="w-full bg-slate-100 dark:bg-slate-800/50 rounded-2xl h-44 flex items-end overflow-hidden">
                 <div 
-                  style={{ height: `${stats?.categoryAnalysis?.Aptitude || 82}%` }}
+                  style={{ height: `${stats?.categoryAnalysis?.Aptitude || 0}%` }}
                   className="w-full bg-gradient-to-t from-blue-700 via-indigo-600 to-purple-500 rounded-b-xl rounded-t-lg transition-all duration-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                 />
               </div>
@@ -278,10 +285,10 @@ const StudentDashboard = () => {
 
             {/* Communication Bar */}
             <div className="flex flex-col items-center gap-2 group h-full justify-end">
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.Communication || 88}%</span>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.Communication || 0}%</span>
               <div className="w-full bg-slate-100 dark:bg-slate-800/50 rounded-2xl h-44 flex items-end overflow-hidden">
                 <div 
-                  style={{ height: `${stats?.categoryAnalysis?.Communication || 88}%` }}
+                  style={{ height: `${stats?.categoryAnalysis?.Communication || 0}%` }}
                   className="w-full bg-gradient-to-t from-blue-700 via-indigo-600 to-purple-500 rounded-b-xl rounded-t-lg transition-all duration-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                 />
               </div>
@@ -293,10 +300,10 @@ const StudentDashboard = () => {
 
             {/* GD Bar */}
             <div className="flex flex-col items-center gap-2 group h-full justify-end">
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.GD || 75}%</span>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.GD || 0}%</span>
               <div className="w-full bg-slate-100 dark:bg-slate-800/50 rounded-2xl h-44 flex items-end overflow-hidden">
                 <div 
-                  style={{ height: `${stats?.categoryAnalysis?.GD || 75}%` }}
+                  style={{ height: `${stats?.categoryAnalysis?.GD || 0}%` }}
                   className="w-full bg-gradient-to-t from-blue-700 via-indigo-600 to-purple-500 rounded-b-xl rounded-t-lg transition-all duration-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                 />
               </div>
@@ -308,10 +315,10 @@ const StudentDashboard = () => {
 
             {/* Mock Interview Bar */}
             <div className="flex flex-col items-center gap-2 group h-full justify-end">
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.MockInterview || 85}%</span>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 opacity-90">{stats?.categoryAnalysis?.MockInterview || 0}%</span>
               <div className="w-full bg-slate-100 dark:bg-slate-800/50 rounded-2xl h-44 flex items-end overflow-hidden">
                 <div 
-                  style={{ height: `${stats?.categoryAnalysis?.MockInterview || 85}%` }}
+                  style={{ height: `${stats?.categoryAnalysis?.MockInterview || 0}%` }}
                   className="w-full bg-gradient-to-t from-blue-700 via-indigo-600 to-purple-500 rounded-b-xl rounded-t-lg transition-all duration-500 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
                 />
               </div>

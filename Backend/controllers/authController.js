@@ -161,10 +161,10 @@ module.exports = {
   */
   updateProfile: async (req, res, next) => {
     try {
-      const { name, department, roll_no, year, cgpa } = req.body;
+      const { name, department, phone, roll_no, year, cgpa } = req.body;
       
-      // Update core user row
-      const updatedUser = await User.updateProfile(req.user.user_id, name, department);
+      // Update core user row (including phone!)
+      await User.updateProfile(req.user.user_id, name, department, phone);
       
       // If student, also update student-specific row
       if (req.user.role === 'STUDENT') {
@@ -173,6 +173,203 @@ module.exports = {
 
       const fullProfile = await Student.getStudentProfile(req.user.user_id);
       return res.status(200).json({ success: true, user: fullProfile });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /*
+  PUT /api/auth/change-password
+  Changes authenticated user password (via old password OR email OTP verification).
+  */
+  changePassword: async (req, res, next) => {
+    try {
+      const { currentPassword, newPassword, otpCode } = req.body;
+      if (!newPassword) {
+        return res.status(400).json({ success: false, message: 'New password is required.' });
+      }
+
+      const db = require('../config/db');
+      const userId = req.user.user_id;
+
+      // 1. Fetch user credentials & OTP columns
+      const userRes = await db.query(
+        'SELECT password_hash, otp_code, otp_expires FROM users WHERE user_id = $1',
+        [userId]
+      );
+      const user = userRes.rows[0];
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found.' });
+      }
+
+      // 2. Determine verification method
+      if (otpCode) {
+        // Verify via OTP code
+        const isOtpMatch = user.otp_code && user.otp_code === otpCode.trim();
+        const isNotExpired = user.otp_expires && new Date(user.otp_expires) > new Date();
+
+        if (!isOtpMatch || !isNotExpired) {
+          return res.status(400).json({ success: false, message: 'Invalid or expired verification OTP.' });
+        }
+      } else if (currentPassword) {
+        // Verify via current password comparison
+        const match = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!match) {
+          return res.status(400).json({ success: false, message: 'Incorrect current password.' });
+        }
+      } else {
+        return res.status(400).json({ success: false, message: 'Please provide either your current password or an email OTP code.' });
+      }
+
+      // 3. Hash new password and update in database
+      const salt = await bcrypt.genSalt(10);
+      const newHash = await bcrypt.hash(newPassword, salt);
+
+      await db.query(
+        `UPDATE users 
+         SET password_hash = $1, otp_code = NULL, otp_expires = NULL 
+         WHERE user_id = $2`,
+        [newHash, userId]
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Password changed successfully.'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /*
+  POST /api/auth/send-otp
+  Dispatches OTP code to user's registered email address.
+  */
+  sendOTP: async (req, res, next) => {
+    try {
+      const db = require('../config/db');
+      const userId = req.user.user_id;
+
+      // 1. Generate 6-digit OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // 2. Fetch email
+      const userRes = await db.query(
+        'SELECT email FROM users WHERE user_id = $1',
+        [userId]
+      );
+      const user = userRes.rows[0];
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found.' });
+      }
+
+      // 3. Save OTP in db with 10 minutes expiry
+      await db.query(
+        `UPDATE users 
+         SET otp_code = $1, otp_expires = NOW() + INTERVAL '10 minutes' 
+         WHERE user_id = $2`,
+        [otpCode, userId]
+      );
+
+      // 4. Send email
+      await emailService.sendOTPEmail(user.email, otpCode);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Verification OTP sent to your registered email.'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /*
+  GET /api/auth/settings
+  Pulls visual preferences and alerts toggles.
+  */
+  getSettings: async (req, res, next) => {
+    try {
+      const db = require('../config/db');
+      const userId = req.user.user_id;
+
+      let settingsRes = await db.query(
+        'SELECT * FROM user_settings WHERE user_id = $1',
+        [userId]
+      );
+
+      // Create default if row not found
+      if (settingsRes.rows.length === 0) {
+        await db.query(
+          'INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING',
+          [userId]
+        );
+        settingsRes = await db.query(
+          'SELECT * FROM user_settings WHERE user_id = $1',
+          [userId]
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        settings: settingsRes.rows[0]
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+
+  /*
+  PUT /api/auth/settings
+  Saves visual preferences and alerts toggles.
+  */
+  updateSettings: async (req, res, next) => {
+    try {
+      const db = require('../config/db');
+      const userId = req.user.user_id;
+      const { 
+        theme, 
+        accent_color, 
+        font_size, 
+        email_grade, 
+        weekly_summary, 
+        new_messages, 
+        upcoming_deadlines, 
+        marketing, 
+        notification_channel 
+      } = req.body;
+
+      const updateRes = await db.query(
+        `UPDATE user_settings 
+         SET theme = COALESCE($1, theme),
+             accent_color = COALESCE($2, accent_color),
+             font_size = COALESCE($3, font_size),
+             email_grade = COALESCE($4, email_grade),
+             weekly_summary = COALESCE($5, weekly_summary),
+             new_messages = COALESCE($6, new_messages),
+             upcoming_deadlines = COALESCE($7, upcoming_deadlines),
+             marketing = COALESCE($8, marketing),
+             notification_channel = COALESCE($9, notification_channel)
+         WHERE user_id = $10
+         RETURNING *`,
+        [
+          theme, 
+          accent_color, 
+          font_size, 
+          email_grade, 
+          weekly_summary, 
+          new_messages, 
+          upcoming_deadlines, 
+          marketing, 
+          notification_channel,
+          userId
+        ]
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Settings updated successfully.',
+        settings: updateRes.rows[0]
+      });
     } catch (error) {
       return next(error);
     }

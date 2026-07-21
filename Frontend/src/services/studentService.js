@@ -29,5 +29,26 @@ export default {
   */
   getAttendance: () => {
     return axiosClient.get('/student/attendance').then(res => res.data);
+  },
+
+  /*
+  Fetches list of all faculty members.
+  */
+  getFaculties: () => {
+    return axiosClient.get('/student/faculties').then(res => res.data);
+  },
+
+  /*
+  Fetches student's assigned faculty mentor.
+  */
+  getMyFaculty: () => {
+    return axiosClient.get('/student/my-faculty').then(res => res.data);
+  },
+
+  /*
+  Assigns a faculty advisor to the student.
+  */
+  assignFaculty: (facultyId) => {
+    return axiosClient.post('/student/assign-faculty', { facultyId }).then(res => res.data);
   }
 };

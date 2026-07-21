@@ -31,6 +31,12 @@ Returns top placement score performers.
 router.get('/leaderboard', protect, aptitudeController.getLeaderboard);
 
 /*
+GET /api/aptitude/stats
+Returns user statistics log aggregates.
+*/
+router.get('/stats', protect, aptitudeController.getAptitudeStats);
+
+/*
 POST /api/aptitude/answers/submit
 Logs student subjective answers for grading.
 */

@@ -51,6 +51,9 @@ import NotFound from '../pages/NotFound';
 import CareerAdvisor from '../pages/CareerAdvisor';
 import DiscussionForum from '../pages/DiscussionForum';
 import CodingArena from '../pages/CodingArena';
+import FacultyStudentProfile from '../pages/FacultyStudentProfile';
+import FacultyTaskManager from '../pages/FacultyTaskManager';
+import StudentTaskBoard from '../pages/StudentTaskBoard';
 
 const AppRoutes = () => {
   return (
@@ -97,6 +100,10 @@ const AppRoutes = () => {
           path="/leaderboard" 
           element={<ProtectedRoute allowedRoles={['STUDENT']}><Leaderboard /></ProtectedRoute>} 
         />
+        <Route 
+          path="/student/tasks" 
+          element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentTaskBoard /></ProtectedRoute>} 
+        />
 
         {/* Faculty Specific */}
         <Route 
@@ -114,6 +121,14 @@ const AppRoutes = () => {
         <Route 
           path="/faculty/evaluations" 
           element={<ProtectedRoute allowedRoles={['FACULTY']}><FacultyDashboard /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/faculty/tasks" 
+          element={<ProtectedRoute allowedRoles={['FACULTY', 'ADMIN']}><FacultyTaskManager /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/faculty/student/:id" 
+          element={<ProtectedRoute allowedRoles={['FACULTY', 'ADMIN']}><FacultyStudentProfile /></ProtectedRoute>} 
         />
 
         {/* Placement Specific */}

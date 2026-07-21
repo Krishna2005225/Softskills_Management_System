@@ -24,3 +24,8 @@ out/
 # Local uploads folder files
 Backend/uploads/*
 !Backend/uploads/.gitkeep
+
+# Temporary test/scratch scripts
+Backend/test_*.js
+Backend/list_models.js
+Backend/patch_*.js

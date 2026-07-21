@@ -43,4 +43,10 @@ Rewrites a portion of user resume.
 */
 router.post('/ai-rewrite', protect, resumeController.aiRewriteResume);
 
+/*
+POST /api/resume/evaluate-json
+Evaluates JSON structured resume in real-time.
+*/
+router.post('/evaluate-json', protect, resumeController.evaluateJsonResume);
+
 module.exports = router;

@@ -53,5 +53,9 @@ PUT /api/auth/profile
 Saves profile changes.
 */
 router.put('/profile', protect, authController.updateProfile);
+router.put('/change-password', protect, authController.changePassword);
+router.post('/send-otp', protect, authController.sendOTP);
+router.get('/settings', protect, authController.getSettings);
+router.put('/settings', protect, authController.updateSettings);
 
 module.exports = router;

@@ -15,5 +15,6 @@ router.get('/posts', protect, forumController.listPosts);
 router.post('/posts', protect, forumController.createPost);
 router.get('/posts/:postId/comments', protect, forumController.listComments);
 router.post('/posts/:postId/comments', protect, forumController.addComment);
+router.post('/posts/:postId/like', protect, forumController.likePost);
 
 module.exports = router;

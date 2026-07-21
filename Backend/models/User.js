@@ -17,7 +17,7 @@ module.exports = {
   */
   findById: async (userId) => {
     const res = await db.query(
-      'SELECT user_id, name, email, role, department, created_at FROM users WHERE user_id = $1',
+      'SELECT user_id, name, email, phone, role, department, created_at FROM users WHERE user_id = $1',
       [userId]
     );
     return res.rows[0];
@@ -30,7 +30,7 @@ module.exports = {
   */
   findByEmail: async (email) => {
     const res = await db.query(
-      'SELECT user_id, name, email, password_hash, role, department FROM users WHERE email = $1',
+      'SELECT user_id, name, email, phone, password_hash, role, department FROM users WHERE email = $1',
       [email]
     );
     return res.rows[0];
@@ -45,21 +45,24 @@ module.exports = {
     const res = await db.query(
       `INSERT INTO users (name, email, password_hash, role, department)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING user_id, name, email, role, department`,
+       RETURNING user_id, name, email, phone, role, department`,
       [name, email, passwordHash, role, department]
     );
     return res.rows[0];
   },
 
   /*
-  Updates user name and department in the database.
-  Params: userId (UUID), name, department.
+  Updates user name, department and phone in the database.
+  Params: userId (UUID), name, department, phone.
   Returns: Updated user row.
   */
-  updateProfile: async (userId, name, department) => {
+  updateProfile: async (userId, name, department, phone) => {
     const res = await db.query(
-      `UPDATE users SET name = $1, department = $2 WHERE user_id = $3 RETURNING user_id, name, email, role, department`,
-      [name, department, userId]
+      `UPDATE users 
+       SET name = $1, department = $2, phone = COALESCE($3, phone) 
+       WHERE user_id = $4 
+       RETURNING user_id, name, email, phone, role, department`,
+      [name, department, phone, userId]
     );
     return res.rows[0];
   }

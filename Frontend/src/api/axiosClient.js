@@ -10,8 +10,8 @@ Dependencies: axios
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+  timeout: 60000,
 });
 
 // Outbound request interceptor configuration

@@ -12,6 +12,12 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Bypass proxy configuration that hangs outgoing network requests on this system
+delete process.env.HTTP_PROXY;
+delete process.env.HTTPS_PROXY;
+delete process.env.http_proxy;
+delete process.env.https_proxy;
+
 // Middleware imports
 const { requestLogger } = require('./middleware/loggingMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -30,6 +36,12 @@ const reportRoutes = require('./routes/reportRoutes');
 const advisorRoutes = require('./routes/advisorRoutes');
 const forumRoutes = require('./routes/forumRoutes');
 const certificateRoutes = require('./routes/certificateRoutes');
+const codingRoutes = require('./routes/codingRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+
+// Background Jobs
+const { startOverdueTaskJob } = require('./jobs/overdueTaskJob');
 
 // Initialize application
 const app = express();
@@ -67,6 +79,9 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/advisor', advisorRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/certificates', certificateRoutes);
+app.use('/api/coding', codingRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Fallback Route (404 Page)
 app.use((req, res, next) => {
@@ -82,6 +97,8 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server started in ${process.env.NODE_ENV || 'development'} mode on port: ${PORT}`);
+  // Start background jobs
+  startOverdueTaskJob();
 });
 
 // Resilient Crash Prevention Handlers
