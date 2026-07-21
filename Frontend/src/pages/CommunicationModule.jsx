@@ -583,7 +583,6 @@ const CommunicationModule = () => {
                     </button>
                   </div>
                 )}
-              </div>
 
                 <div className="flex justify-between items-center">
                   <button 

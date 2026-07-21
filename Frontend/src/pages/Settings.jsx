@@ -10,7 +10,7 @@ Dependencies: react, Card, ThemeContext, axiosClient, lucide-react
 import React, { useContext, useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import Card from '../components/Card';
-import { ThemeContext } from '../contexts/ThemeContext';
+import { ThemeContext, themesList } from '../contexts/ThemeContext';
 import { 
   Sun, 
   Moon, 
@@ -25,7 +25,10 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
-  const { darkMode, toggleTheme, accentColor, setAccentColor, fontSize, setFontSize } = useContext(ThemeContext);
+  const { 
+    darkMode, toggleTheme, accentColor, setAccentColor, 
+    fontSize, setFontSize, customColor, setCustomColor 
+  } = useContext(ThemeContext);
   
   // Settings States
   const [selectedTheme, setSelectedTheme] = useState(darkMode ? 'dark' : 'light');
@@ -254,21 +257,51 @@ const Settings = () => {
 
               {/* Accent Color */}
               <div className="space-y-2.5">
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  Accent Color
-                </label>
-                <div className="flex gap-4">
-                  {accentColors.map((color) => (
-                    <button
-                      key={color.id}
-                      onClick={() => handleAccentChange(color.id)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-105 shadow-sm ${color.class}`}
-                    >
-                      {accentColor === color.id && (
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      )}
-                    </button>
-                  ))}
+                <div className="flex justify-between items-center">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Accent Color / Theme Preset
+                  </label>
+                  <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                    13 Options
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-6 gap-3 pt-1">
+                  {Object.keys(themesList).map(key => {
+                    const t = themesList[key];
+                    const isSelected = accentColor === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleAccentChange(key)}
+                        style={{ backgroundColor: t.primary }}
+                        title={t.name}
+                        className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 relative transition-all transform hover:scale-110 active:scale-95 shadow-sm flex items-center justify-center cursor-pointer"
+                      >
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-white stroke-2" />
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  {/* Custom Color Selector Button */}
+                  <div className="w-8 h-8 rounded-full relative flex items-center justify-center border-2 border-white dark:border-slate-800 overflow-hidden shadow-sm">
+                    <input
+                      type="color"
+                      value={customColor}
+                      onChange={(e) => {
+                        handleAccentChange('custom');
+                        setCustomColor(e.target.value);
+                      }}
+                      className="absolute inset-0 w-full h-full cursor-pointer scale-150"
+                      title="Custom Color Theme"
+                    />
+                    {accentColor === 'custom' && (
+                      <Check className="w-4 h-4 text-white stroke-2 absolute pointer-events-none" />
+                    )}
+                  </div>
                 </div>
               </div>
 
